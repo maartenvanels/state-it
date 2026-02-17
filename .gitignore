@@ -40,5 +40,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# npm lockfile (using bun)
+package-lock.json
+
 # claude
 .claude/
+
+.vercel
