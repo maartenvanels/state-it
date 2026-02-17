@@ -15,6 +15,8 @@ export interface TransitionEdgeData {
   label: TransitionLabel;
   priority: number;
   isDefault: boolean;
+  labelOffsetX: number;
+  labelOffsetY: number;
   [key: string]: unknown;
 }
 

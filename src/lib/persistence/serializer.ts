@@ -127,6 +127,8 @@ export function deserializeProjectToCanvas(project: Project): {
         label: transition.label,
         priority: transition.priority,
         isDefault: transition.isDefault,
+        labelOffsetX: 0,
+        labelOffsetY: 0,
       },
     };
     edges.push(edge);

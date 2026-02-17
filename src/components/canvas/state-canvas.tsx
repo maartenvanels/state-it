@@ -377,8 +377,8 @@ export function StateCanvas() {
             <Background
               variant={BackgroundVariant.Dots}
               gap={gridSize}
-              size={1}
-              color="color-mix(in oklch, var(--muted-foreground) 30%, transparent)"
+              size={1.5}
+              color="color-mix(in oklch, var(--muted-foreground) 50%, transparent)"
             />
           )}
           <Controls

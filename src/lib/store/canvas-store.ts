@@ -299,6 +299,8 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
             label: { ...EMPTY_TRANSITION_LABEL },
             priority: outgoingCount + 1,
             isDefault: false,
+            labelOffsetX: 0,
+            labelOffsetY: 0,
           },
         };
 
@@ -342,6 +344,8 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
             label: { event: null, condition: null, conditionAction: null, transitionAction: null },
             priority: 0,
             isDefault: true,
+            labelOffsetX: 0,
+            labelOffsetY: 0,
           },
         };
 

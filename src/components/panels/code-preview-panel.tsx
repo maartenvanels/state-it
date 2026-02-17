@@ -59,7 +59,7 @@ export function CodePreviewPanel() {
       <Tabs
         value={language}
         onValueChange={(v) => setLanguage(v as 'c' | 'scl')}
-        className="flex-1 flex flex-col"
+        className="flex-1 flex flex-col min-h-0"
       >
         <div className="flex items-center justify-between border-b px-2 py-1">
           <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
@@ -104,7 +104,7 @@ export function CodePreviewPanel() {
           </div>
         </div>
 
-        <TabsContent value="c" className="flex-1 m-0">
+        <TabsContent value="c" className="flex-1 m-0 min-h-0">
           <ScrollArea className="h-full">
             <pre className="p-3 text-xs font-mono leading-relaxed whitespace-pre">
               {stateCount === 0 ? (
@@ -124,7 +124,7 @@ export function CodePreviewPanel() {
           </ScrollArea>
         </TabsContent>
 
-        <TabsContent value="scl" className="flex-1 m-0">
+        <TabsContent value="scl" className="flex-1 m-0 min-h-0">
           <ScrollArea className="h-full">
             <pre className="p-3 text-xs font-mono leading-relaxed whitespace-pre">
               {stateCount === 0 ? (
