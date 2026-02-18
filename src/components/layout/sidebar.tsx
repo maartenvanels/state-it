@@ -15,11 +15,13 @@ import {
   Plus,
   Pencil,
   Trash2,
+  BookOpen,
 } from 'lucide-react';
 import type { CanvasNode } from '@/lib/types/canvas';
 import type { Variable } from '@/lib/types/variable';
 import { VariableDialog } from '@/components/dialogs/variable-dialog';
 import { DATA_TYPE_TO_C } from '@/lib/types/variable';
+import { HelpPanel } from '@/components/panels/help-panel';
 
 export function Sidebar() {
   const leftPanelTab = useUIStore((s) => s.leftPanelTab);
@@ -49,10 +51,10 @@ export function Sidebar() {
     <div className="flex h-full flex-col">
       <Tabs
         value={leftPanelTab}
-        onValueChange={(v) => setLeftPanelTab(v as 'hierarchy' | 'data')}
+        onValueChange={(v) => setLeftPanelTab(v as 'hierarchy' | 'data' | 'help')}
         className="flex-1 flex flex-col"
       >
-        <TabsList className="mx-2 mt-2 grid w-auto grid-cols-2">
+        <TabsList className="mx-2 mt-2 grid w-auto grid-cols-3">
           <TabsTrigger value="hierarchy" className="text-xs">
             <GitBranchPlus className="mr-1 h-3 w-3" />
             States
@@ -60,6 +62,10 @@ export function Sidebar() {
           <TabsTrigger value="data" className="text-xs">
             <Database className="mr-1 h-3 w-3" />
             Data
+          </TabsTrigger>
+          <TabsTrigger value="help" className="text-xs">
+            <BookOpen className="mr-1 h-3 w-3" />
+            Syntax
           </TabsTrigger>
         </TabsList>
 
@@ -118,6 +124,12 @@ export function Sidebar() {
               )}
             </ScrollArea>
           </div>
+        </TabsContent>
+
+        <TabsContent value="help" className="flex-1 m-0">
+          <ScrollArea className="h-full">
+            <HelpPanel />
+          </ScrollArea>
         </TabsContent>
       </Tabs>
 

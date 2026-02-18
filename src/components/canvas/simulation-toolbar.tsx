@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -15,7 +15,12 @@ import { useSimulationStore } from '@/lib/store/simulation-store';
 import { useCanvasStore } from '@/lib/store/canvas-store';
 import { useProjectStore } from '@/lib/store/project-store';
 import { buildModel } from '@/lib/codegen/model-builder';
-import { evaluateStep, collectModelEvents } from '@/lib/codegen/simulator';
+import {
+  evaluateStep,
+  collectModelEvents,
+  createSimulationContext,
+  type SimulationContext,
+} from '@/lib/codegen/simulator';
 
 export function SimulationToolbar() {
   const isActive = useSimulationStore((s) => s.isActive);
@@ -43,9 +48,12 @@ export function SimulationToolbar() {
     );
   }, [nodes, edges, project]);
 
+  const simCtxRef = useRef<SimulationContext | null>(null);
+
   const handleStart = useCallback(() => {
     if (!model || !model.defaultStateId) return;
     const events = collectModelEvents(model);
+    simCtxRef.current = createSimulationContext(model);
     startSimulation(model.defaultStateId, events);
   }, [model, startSimulation]);
 
@@ -56,7 +64,7 @@ export function SimulationToolbar() {
   const handleStep = useCallback(() => {
     if (!model || !activeStateId) return;
     incrementStep();
-    const result = evaluateStep(model, activeStateId, null, stepCount + 1);
+    const result = evaluateStep(model, activeStateId, null, stepCount + 1, simCtxRef.current ?? undefined);
     if (result) {
       setActiveState(result.toStateId!, result);
     }
@@ -70,7 +78,8 @@ export function SimulationToolbar() {
         model,
         activeStateId,
         event,
-        stepCount + 1
+        stepCount + 1,
+        simCtxRef.current ?? undefined
       );
       if (result) {
         setActiveState(result.toStateId!, result);
@@ -81,6 +90,7 @@ export function SimulationToolbar() {
 
   const handleReset = useCallback(() => {
     if (!model || !model.defaultStateId) return;
+    simCtxRef.current = createSimulationContext(model);
     resetSim(model.defaultStateId);
   }, [model, resetSim]);
 

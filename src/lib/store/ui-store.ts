@@ -24,7 +24,7 @@ interface UIState {
   rightPanelOpen: boolean;
   bottomPanelOpen: boolean;
 
-  leftPanelTab: 'hierarchy' | 'data';
+  leftPanelTab: 'hierarchy' | 'data' | 'help';
   codePreviewLanguage: 'c' | 'scl';
 
   activeDialog: DialogType | null;
@@ -50,7 +50,7 @@ interface UIActions {
   setSelection: (nodeIds: string[], edgeIds: string[]) => void;
   togglePanel: (panel: 'left' | 'right' | 'bottom') => void;
   setPanelOpen: (panel: 'left' | 'right' | 'bottom', open: boolean) => void;
-  setLeftPanelTab: (tab: 'hierarchy' | 'data') => void;
+  setLeftPanelTab: (tab: 'hierarchy' | 'data' | 'help') => void;
   setCodePreviewLanguage: (lang: 'c' | 'scl') => void;
   setInteractionMode: (mode: InteractionMode) => void;
   openDialog: (type: DialogType, props?: Record<string, unknown>) => void;

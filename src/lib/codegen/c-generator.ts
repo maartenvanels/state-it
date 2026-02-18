@@ -1,8 +1,15 @@
 import type { StateMachineModel, GeneratedCode } from '../types/codegen';
 import { DATA_TYPE_TO_C } from '../types/variable';
+import {
+  translateConditionToC,
+  translateActionToC,
+  usesTemporalLogic,
+} from '../syntax/translate';
+import type { CEmitOptions } from '../syntax/c-emitter';
 
 /**
- * Generate C code from a state machine model
+ * Generate C code from a state machine model.
+ * Conditions and actions are parsed from State-It syntax and translated to C.
  */
 export function generateC(model: StateMachineModel): GeneratedCode {
   if (model.states.length === 0) {
@@ -13,13 +20,21 @@ export function generateC(model: StateMachineModel): GeneratedCode {
   }
 
   const sm = model.name;
-  const header = generateHeader(model, sm);
-  const source = generateSource(model, sm);
+  const varNames = new Set(model.variables.map((v) => v.name));
+  const emitOpts: CEmitOptions = { varPrefix: 'sm->', variables: varNames };
+  const needsTemporal = checkTemporalUsage(model);
+
+  const header = generateHeader(model, sm, needsTemporal);
+  const source = generateSource(model, sm, emitOpts, needsTemporal);
 
   return { header, source };
 }
 
-function generateHeader(model: StateMachineModel, sm: string): string {
+function generateHeader(
+  model: StateMachineModel,
+  sm: string,
+  needsTemporal: boolean
+): string {
   const lines: string[] = [];
   const guard = `${sm}_H`;
 
@@ -83,6 +98,12 @@ function generateHeader(model: StateMachineModel, sm: string): string {
     lines.push(`    ${sm}_SubState_${state.safeName} subState_${state.safeName};`);
   }
 
+  // Temporal tick counter
+  if (needsTemporal) {
+    lines.push('    /* Temporal logic counter */');
+    lines.push('    uint32_t _stateTickCount;');
+  }
+
   // User variables
   if (model.variables.length > 0) {
     lines.push('    /* Variables */');
@@ -111,7 +132,12 @@ function generateHeader(model: StateMachineModel, sm: string): string {
   return lines.join('\n');
 }
 
-function generateSource(model: StateMachineModel, sm: string): string {
+function generateSource(
+  model: StateMachineModel,
+  sm: string,
+  emitOpts: CEmitOptions,
+  needsTemporal: boolean
+): string {
   const lines: string[] = [];
   const events = collectEvents(model);
   const rootStates = model.states.filter((s) => s.parentId === null);
@@ -136,6 +162,11 @@ function generateSource(model: StateMachineModel, sm: string): string {
     }
   }
 
+  // Initialize temporal counter
+  if (needsTemporal) {
+    lines.push('    sm->_stateTickCount = 0;');
+  }
+
   // Initialize variables
   for (const v of model.variables) {
     if (v.initialValue) {
@@ -147,7 +178,9 @@ function generateSource(model: StateMachineModel, sm: string): string {
   if (defaultState && defaultState.actions.entry.length > 0) {
     lines.push('    /* Entry actions for initial state */');
     for (const action of defaultState.actions.entry) {
-      lines.push(`    ${action};`);
+      for (const stmt of translateActionToC(action, emitOpts)) {
+        lines.push(`    ${stmt}`);
+      }
     }
   }
 
@@ -158,6 +191,11 @@ function generateSource(model: StateMachineModel, sm: string): string {
   const eventParam = events.length > 0 ? `, ${sm}_Event event` : '';
   lines.push(`void ${sm}_Step(${sm}* sm${eventParam}) {`);
   lines.push(`    sm->previousState = sm->currentState;`);
+
+  if (needsTemporal) {
+    lines.push('    sm->_stateTickCount++;');
+  }
+
   lines.push('');
   lines.push(`    switch (sm->currentState) {`);
 
@@ -168,7 +206,9 @@ function generateSource(model: StateMachineModel, sm: string): string {
     if (state.actions.during.length > 0) {
       lines.push('            /* During actions */');
       for (const action of state.actions.during) {
-        lines.push(`            ${action};`);
+        for (const stmt of translateActionToC(action, emitOpts)) {
+          lines.push(`            ${stmt}`);
+        }
       }
       lines.push('');
     }
@@ -191,7 +231,7 @@ function generateSource(model: StateMachineModel, sm: string): string {
           condParts.push(`event == ${sm}_EVENT_${trans.event.toUpperCase()}`);
         }
         if (trans.condition) {
-          condParts.push(trans.condition);
+          condParts.push(translateConditionToC(trans.condition, emitOpts));
         }
 
         const condition = condParts.length > 0
@@ -211,30 +251,43 @@ function generateSource(model: StateMachineModel, sm: string): string {
         if (state.actions.exit.length > 0) {
           lines.push(`                /* Exit ${state.name} */`);
           for (const action of state.actions.exit) {
-            lines.push(`                ${action};`);
+            for (const stmt of translateActionToC(action, emitOpts)) {
+              lines.push(`                ${stmt}`);
+            }
           }
         }
 
         // Condition action
         if (trans.conditionAction) {
           lines.push(`                /* Condition action */`);
-          lines.push(`                ${trans.conditionAction};`);
+          for (const stmt of translateActionToC(trans.conditionAction, emitOpts)) {
+            lines.push(`                ${stmt}`);
+          }
         }
 
         // Transition action
         if (trans.transitionAction) {
           lines.push(`                /* Transition action */`);
-          lines.push(`                ${trans.transitionAction};`);
+          for (const stmt of translateActionToC(trans.transitionAction, emitOpts)) {
+            lines.push(`                ${stmt}`);
+          }
         }
 
         // State change
         lines.push(`                sm->currentState = STATE_${targetState.safeName};`);
 
+        // Reset temporal counter on state change
+        if (needsTemporal) {
+          lines.push('                sm->_stateTickCount = 0;');
+        }
+
         // Entry actions of target
         if (targetState.actions.entry.length > 0) {
           lines.push(`                /* Entry ${targetState.name} */`);
           for (const action of targetState.actions.entry) {
-            lines.push(`                ${action};`);
+            for (const stmt of translateActionToC(action, emitOpts)) {
+              lines.push(`                ${stmt}`);
+            }
           }
         }
 
@@ -271,7 +324,6 @@ function findDefaultChild(
   parent: { childIds: string[] },
   model: StateMachineModel
 ) {
-  // Check for default transition pointing to a child
   const defaultTrans = model.transitions.find(
     (t) => t.isDefault && parent.childIds.includes(t.targetId)
   );
@@ -279,12 +331,26 @@ function findDefaultChild(
     return model.states.find((s) => s.id === defaultTrans.targetId) ?? null;
   }
 
-  // Check for isDefault flag on children
   const defaultChild = model.states.find(
     (s) => parent.childIds.includes(s.id) && s.isDefault
   );
   if (defaultChild) return defaultChild;
 
-  // Fallback: first child
   return model.states.find((s) => parent.childIds.includes(s.id)) ?? null;
+}
+
+/**
+ * Check if any condition or action in the model uses temporal expressions.
+ */
+function checkTemporalUsage(model: StateMachineModel): boolean {
+  const allExpressions: string[] = [];
+  for (const t of model.transitions) {
+    if (t.condition) allExpressions.push(t.condition);
+    if (t.conditionAction) allExpressions.push(t.conditionAction);
+    if (t.transitionAction) allExpressions.push(t.transitionAction);
+  }
+  for (const s of model.states) {
+    allExpressions.push(...s.actions.entry, ...s.actions.during, ...s.actions.exit);
+  }
+  return usesTemporalLogic(allExpressions);
 }

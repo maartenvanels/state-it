@@ -1,9 +1,16 @@
 import type { StateMachineModel } from '../types/codegen';
 import { DATA_TYPE_TO_SCL } from '../types/variable';
+import {
+  translateConditionToSCL,
+  translateActionToSCL,
+  usesTemporalLogic,
+} from '../syntax/translate';
+import type { SCLEmitOptions } from '../syntax/scl-emitter';
 
 /**
- * Generate Siemens TIA Portal SCL code from a state machine model
- * Target: S7-1500
+ * Generate Siemens TIA Portal SCL code from a state machine model.
+ * Target: S7-1500.
+ * Conditions and actions are parsed from State-It syntax and translated to SCL.
  */
 export function generateSCL(model: StateMachineModel): string {
   if (model.states.length === 0) {
@@ -14,6 +21,9 @@ export function generateSCL(model: StateMachineModel): string {
   const fbName = `FB_${model.name}`;
   const rootStates = model.states.filter((s) => s.parentId === null);
   const events = collectEvents(model);
+  const varNames = new Set(model.variables.map((v) => v.name));
+  const emitOpts: SCLEmitOptions = { varPrefix: '#', variables: varNames };
+  const needsTemporal = checkTemporalUsage(model);
 
   lines.push(`FUNCTION_BLOCK "${fbName}"`);
   lines.push('');
@@ -56,6 +66,10 @@ export function generateSCL(model: StateMachineModel): string {
     if (state.childIds.length === 0) continue;
     lines.push(`    sSubState_${state.safeName} : INT;`);
   }
+  // Temporal counter
+  if (needsTemporal) {
+    lines.push(`    _stateTickCount : UDINT;`);
+  }
   // User local variables
   for (const v of model.variables.filter((v) => v.scope === 'local')) {
     const sclType = DATA_TYPE_TO_SCL[v.dataType];
@@ -90,6 +104,11 @@ export function generateSCL(model: StateMachineModel): string {
   // BEGIN - main logic
   lines.push('BEGIN');
   lines.push(`    #sPrevState := #sState;`);
+
+  if (needsTemporal) {
+    lines.push(`    #_stateTickCount := #_stateTickCount + 1;`);
+  }
+
   lines.push('');
   lines.push(`    CASE #sState OF`);
 
@@ -100,7 +119,9 @@ export function generateSCL(model: StateMachineModel): string {
     if (state.actions.during.length > 0) {
       lines.push('            (* During actions *)');
       for (const action of state.actions.during) {
-        lines.push(`            ${action};`);
+        for (const stmt of translateActionToSCL(action, emitOpts)) {
+          lines.push(`            ${stmt}`);
+        }
       }
       lines.push('');
     }
@@ -123,7 +144,7 @@ export function generateSCL(model: StateMachineModel): string {
           condParts.push(`#x${capitalize(trans.event)}`);
         }
         if (trans.condition) {
-          condParts.push(trans.condition);
+          condParts.push(translateConditionToSCL(trans.condition, emitOpts));
         }
 
         const condition = condParts.length > 0
@@ -137,29 +158,42 @@ export function generateSCL(model: StateMachineModel): string {
         if (state.actions.exit.length > 0) {
           lines.push(`                (* Exit ${state.name} *)`);
           for (const action of state.actions.exit) {
-            lines.push(`                ${action};`);
+            for (const stmt of translateActionToSCL(action, emitOpts)) {
+              lines.push(`                ${stmt}`);
+            }
           }
         }
 
         // Condition action
         if (trans.conditionAction) {
-          lines.push(`                ${trans.conditionAction};`);
+          for (const stmt of translateActionToSCL(trans.conditionAction, emitOpts)) {
+            lines.push(`                ${stmt}`);
+          }
         }
 
         // Transition action
         if (trans.transitionAction) {
           lines.push(`                (* Transition action *)`);
-          lines.push(`                ${trans.transitionAction};`);
+          for (const stmt of translateActionToSCL(trans.transitionAction, emitOpts)) {
+            lines.push(`                ${stmt}`);
+          }
         }
 
         // State change
         lines.push(`                #sState := #s${targetState.safeName};`);
 
+        // Reset temporal counter on state change
+        if (needsTemporal) {
+          lines.push(`                #_stateTickCount := 0;`);
+        }
+
         // Entry actions of target
         if (targetState.actions.entry.length > 0) {
           lines.push(`                (* Entry ${targetState.name} *)`);
           for (const action of targetState.actions.entry) {
-            lines.push(`                ${action};`);
+            for (const stmt of translateActionToSCL(action, emitOpts)) {
+              lines.push(`                ${stmt}`);
+            }
           }
         }
       }
@@ -196,4 +230,17 @@ function collectEvents(model: StateMachineModel): string[] {
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function checkTemporalUsage(model: StateMachineModel): boolean {
+  const allExpressions: string[] = [];
+  for (const t of model.transitions) {
+    if (t.condition) allExpressions.push(t.condition);
+    if (t.conditionAction) allExpressions.push(t.conditionAction);
+    if (t.transitionAction) allExpressions.push(t.transitionAction);
+  }
+  for (const s of model.states) {
+    allExpressions.push(...s.actions.entry, ...s.actions.during, ...s.actions.exit);
+  }
+  return usesTemporalLogic(allExpressions);
 }
