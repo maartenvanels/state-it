@@ -43,10 +43,15 @@ export function NodeContextMenu({
   const handleAddDefaultTransition = useCallback(() => {
     const node = nodes.find((n) => n.id === nodeId);
     if (!node) return;
-    addDefaultTransitionNode(nodeId, {
-      x: node.position.x - 60,
-      y: node.position.y + 20,
-    });
+    const nodeWidth = (node.style?.width as number) ?? 200;
+    addDefaultTransitionNode(
+      nodeId,
+      {
+        x: node.position.x + nodeWidth / 2 - 8,
+        y: node.position.y - 40,
+      },
+      node.parentId ?? null
+    );
   }, [nodeId, nodes, addDefaultTransitionNode]);
 
   return (

@@ -52,7 +52,8 @@ interface CanvasActions {
   removeEdges: (edgeIds: string[]) => void;
   addDefaultTransitionNode: (
     targetStateId: string,
-    position: { x: number; y: number }
+    position: { x: number; y: number },
+    parentId?: string | null
   ) => void;
 
   onNodesChange: (changes: NodeChange<CanvasNode>[]) => void;
@@ -322,7 +323,7 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
         });
       },
 
-      addDefaultTransitionNode: (targetStateId, position) => {
+      addDefaultTransitionNode: (targetStateId, position, parentId) => {
         const dotId = generateId();
         const edgeId = generateId();
 
@@ -330,6 +331,7 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
           id: dotId,
           type: 'defaultTransition',
           position,
+          ...(parentId ? { parentId, extent: 'parent' as const } : {}),
           data: { targetStateId },
           style: { width: 16, height: 16 },
         };
@@ -337,7 +339,9 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
         const edge: TransitionEdge = {
           id: edgeId,
           source: dotId,
+          sourceHandle: 'default-source',
           target: targetStateId,
+          targetHandle: 'top-3',
           type: 'transition',
           data: {
             transitionId: edgeId,

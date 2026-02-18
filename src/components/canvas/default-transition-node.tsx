@@ -21,12 +21,12 @@ function DefaultTransitionNodeComponent({
     >
       <Handle
         type="source"
-        position={Position.Right}
+        position={Position.Bottom}
         id="default-source"
         style={{
           width: 6,
           height: 6,
-          right: -3,
+          bottom: -3,
           background: 'transparent',
           border: 'none',
         }}

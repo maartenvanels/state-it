@@ -100,13 +100,17 @@ export function deserializeProjectToCanvas(project: Project): {
           (s) => s.id === transition.targetStateId
         );
         if (targetState) {
+          const nodeWidth = targetState.size.width;
           const dotNode: DefaultTransitionNode = {
             id: transition.sourceStateId,
             type: 'defaultTransition',
             position: {
-              x: targetState.position.x - 60,
-              y: targetState.position.y + 20,
+              x: targetState.position.x + nodeWidth / 2 - 8,
+              y: targetState.position.y - 40,
             },
+            ...(targetState.parentId
+              ? { parentId: targetState.parentId, extent: 'parent' as const }
+              : {}),
             data: { targetStateId: transition.targetStateId },
             style: { width: 16, height: 16 },
           };
@@ -119,8 +123,8 @@ export function deserializeProjectToCanvas(project: Project): {
       id: transition.id,
       source: transition.sourceStateId,
       target: transition.targetStateId,
-      sourceHandle: transition.sourceHandle || undefined,
-      targetHandle: transition.targetHandle || undefined,
+      sourceHandle: transition.sourceHandle || (transition.isDefault ? 'default-source' : undefined),
+      targetHandle: transition.targetHandle || (transition.isDefault ? 'top-3' : undefined),
       type: 'transition',
       data: {
         transitionId: transition.id,

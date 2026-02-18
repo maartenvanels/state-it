@@ -8,6 +8,7 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
+  CircleDot,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -22,6 +23,26 @@ import { useCanvasStore } from '@/lib/store/canvas-store';
 export function Toolbar() {
   const interactionMode = useUIStore((s) => s.interactionMode);
   const setInteractionMode = useUIStore((s) => s.setInteractionMode);
+  const selectedNodeIds = useUIStore((s) => s.selectedNodeIds);
+  const nodes = useCanvasStore((s) => s.nodes);
+  const addDefaultTransitionNode = useCanvasStore((s) => s.addDefaultTransitionNode);
+
+  const selectedStateNode = selectedNodeIds.length === 1
+    ? nodes.find((n) => n.id === selectedNodeIds[0] && n.type === 'stateNode')
+    : undefined;
+
+  const handleAddDefaultTransition = () => {
+    if (!selectedStateNode) return;
+    const nodeWidth = (selectedStateNode.style?.width as number) ?? 200;
+    addDefaultTransitionNode(
+      selectedStateNode.id,
+      {
+        x: selectedStateNode.position.x + nodeWidth / 2 - 8,
+        y: selectedStateNode.position.y - 40,
+      },
+      selectedStateNode.parentId ?? null
+    );
+  };
 
   return (
     <div className="flex h-10 items-center gap-1 border-b bg-background px-2">
@@ -51,6 +72,21 @@ export function Toolbar() {
           </Button>
         </TooltipTrigger>
         <TooltipContent>Add State (S)</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            disabled={!selectedStateNode}
+            onClick={handleAddDefaultTransition}
+          >
+            <CircleDot className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Add Default Transition</TooltipContent>
       </Tooltip>
 
       <Separator orientation="vertical" className="mx-1 h-6" />
