@@ -16,9 +16,12 @@ import type {
   StateNodeData,
   TransitionEdgeData,
   DefaultTransitionNode,
+  AnnotationNode,
+  AnnotationNodeData,
 } from '../types/canvas';
 import { EMPTY_TRANSITION_LABEL } from '../types/transition';
 import { DEFAULT_STATE_ACTIONS, DEFAULT_STATE_SIZE } from '../types/state';
+import { DEFAULT_ANNOTATION_SIZE } from '../utils/constants';
 import { generateId } from '../utils/id-generator';
 
 interface CanvasState {
@@ -43,6 +46,15 @@ interface CanvasActions {
   ) => void;
   nestNode: (childId: string, parentId: string) => void;
   unnestNode: (childId: string) => void;
+
+  addAnnotationNode: (
+    position: { x: number; y: number },
+    content?: string
+  ) => string;
+  updateAnnotationNodeData: (
+    nodeId: string,
+    updates: Partial<AnnotationNodeData>
+  ) => void;
 
   addTransitionEdge: (connection: Connection) => string;
   updateTransitionEdge: (
@@ -161,6 +173,41 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
               ...node,
               style: { ...node.style, width: size.width, height: size.height },
             } as CanvasNode;
+          }),
+        });
+      },
+
+      addAnnotationNode: (position, content = '') => {
+        const id = generateId();
+        const newNode: AnnotationNode = {
+          id,
+          type: 'annotationNode',
+          position,
+          data: {
+            content,
+            color: '#fef08a',
+            image: null,
+            fontSize: 14,
+          },
+          style: {
+            width: DEFAULT_ANNOTATION_SIZE.width,
+            height: DEFAULT_ANNOTATION_SIZE.height,
+          },
+        };
+        set({ nodes: [...get().nodes, newNode] });
+        return id;
+      },
+
+      updateAnnotationNodeData: (nodeId, updates) => {
+        set({
+          nodes: get().nodes.map((node) => {
+            if (node.id === nodeId && node.type === 'annotationNode') {
+              return {
+                ...node,
+                data: { ...node.data, ...updates },
+              } as AnnotationNode;
+            }
+            return node;
           }),
         });
       },

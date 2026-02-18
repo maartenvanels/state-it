@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -10,12 +11,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { useCanvasStore } from '@/lib/store/canvas-store';
 import type { StateNodeData } from '@/lib/types/canvas';
 import type { DecompositionType, ActionBlock } from '@/lib/types/state';
 import { ActionEditor } from '@/components/shared/action-editor';
+import { STATE_COLORS } from '@/lib/utils/constants';
+import { cn } from '@/lib/utils';
 
 interface StatePropertiesProps {
   nodeId: string;
@@ -56,6 +64,15 @@ export function StateProperties({ nodeId, data }: StatePropertiesProps) {
     (checked: boolean) => {
       updateStateNodeData(nodeId, {
         stateBlock: { ...stateBlock, isDefault: checked },
+      });
+    },
+    [stateBlock, nodeId, updateStateNodeData]
+  );
+
+  const handleColorChange = useCallback(
+    (color: string | null) => {
+      updateStateNodeData(nodeId, {
+        stateBlock: { ...stateBlock, color },
       });
     },
     [stateBlock, nodeId, updateStateNodeData]
@@ -118,6 +135,43 @@ export function StateProperties({ nodeId, data }: StatePropertiesProps) {
           checked={stateBlock.isDefault}
           onCheckedChange={handleDefaultChange}
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs">Color</Label>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="h-8 w-full justify-start gap-2">
+              <div
+                className="h-4 w-4 rounded-sm border"
+                style={{ backgroundColor: stateBlock.color ?? 'var(--card)' }}
+              />
+              <span className="text-sm">
+                {STATE_COLORS.find((c) => c.value === stateBlock.color)?.name ?? 'Default'}
+              </span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48 p-3">
+            <div className="grid grid-cols-4 gap-2">
+              {STATE_COLORS.map((color) => (
+                <button
+                  key={color.name}
+                  className={cn(
+                    'h-7 w-7 rounded-md border-2 transition-all hover:scale-110',
+                    stateBlock.color === color.value
+                      ? 'border-foreground ring-2 ring-ring'
+                      : 'border-transparent'
+                  )}
+                  style={{
+                    backgroundColor: color.value ?? 'var(--card)',
+                  }}
+                  onClick={() => handleColorChange(color.value)}
+                  title={color.name}
+                />
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <Separator />

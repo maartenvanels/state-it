@@ -1,4 +1,4 @@
-import type { Project } from '../types/project';
+import type { Project, AnnotationData } from '../types/project';
 import type { StateBlock } from '../types/state';
 import type { Transition } from '../types/transition';
 import type {
@@ -6,9 +6,11 @@ import type {
   TransitionEdge,
   StateNode,
   DefaultTransitionNode,
+  AnnotationNode,
 } from '../types/canvas';
 import { DEFAULT_STATE_SIZE } from '../types/state';
 import { EMPTY_TRANSITION_LABEL } from '../types/transition';
+import { DEFAULT_ANNOTATION_SIZE } from '../utils/constants';
 
 /**
  * Serialize canvas state (nodes + edges) into a Project for storage
@@ -20,6 +22,7 @@ export function serializeCanvasToProject(
 ): Project {
   const states: StateBlock[] = [];
   const transitions: Transition[] = [];
+  const annotations: AnnotationData[] = [];
 
   for (const node of nodes) {
     if (node.type === 'stateNode') {
@@ -30,6 +33,19 @@ export function serializeCanvasToProject(
           width: (node.style?.width as number) ?? DEFAULT_STATE_SIZE.width,
           height: (node.style?.height as number) ?? DEFAULT_STATE_SIZE.height,
         },
+      });
+    } else if (node.type === 'annotationNode') {
+      annotations.push({
+        id: node.id,
+        content: node.data.content,
+        position: node.position,
+        size: {
+          width: (node.style?.width as number) ?? DEFAULT_ANNOTATION_SIZE.width,
+          height: (node.style?.height as number) ?? DEFAULT_ANNOTATION_SIZE.height,
+        },
+        color: node.data.color,
+        image: node.data.image,
+        fontSize: node.data.fontSize ?? 14,
       });
     }
   }
@@ -51,6 +67,7 @@ export function serializeCanvasToProject(
     ...project,
     states,
     transitions,
+    annotations,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -136,6 +153,28 @@ export function deserializeProjectToCanvas(project: Project): {
       },
     };
     edges.push(edge);
+  }
+
+  // Deserialize annotations
+  if (project.annotations) {
+    for (const anno of project.annotations) {
+      const annotationNode: AnnotationNode = {
+        id: anno.id,
+        type: 'annotationNode',
+        position: anno.position,
+        data: {
+          content: anno.content,
+          color: anno.color,
+          image: anno.image,
+          fontSize: anno.fontSize ?? 14,
+        },
+        style: {
+          width: anno.size.width,
+          height: anno.size.height,
+        },
+      };
+      nodes.push(annotationNode);
+    }
   }
 
   return { nodes, edges };

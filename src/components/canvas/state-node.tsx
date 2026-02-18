@@ -87,10 +87,14 @@ function StateNodeComponent({ id, data, selected }: NodeProps<StateNodeType>) {
   );
 
   const isParallel = stateBlock.decomposition === 'parallel';
+  const customColor = stateBlock.color;
   const hasActions =
     stateBlock.actions.entry.length > 0 ||
     stateBlock.actions.during.length > 0 ||
     stateBlock.actions.exit.length > 0;
+
+  // Only apply custom color when no simulation/highlight overrides
+  const useCustomColor = customColor && !isSimActive && !isHighlighted && !isDropTarget;
 
   return (
     <NodeContextMenu nodeId={id} hasParent={!!stateBlock.parentId}>
@@ -102,12 +106,17 @@ function StateNodeComponent({ id, data, selected }: NodeProps<StateNodeType>) {
           'border-blue-500 bg-blue-500/10 ring-2 ring-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.3)]',
         isSimActive && !isActiveState &&
           'opacity-50',
-        !isSimActive && selected && 'border-blue-500 ring-2 ring-blue-500/30',
+        !isSimActive && selected && !useCustomColor && 'border-blue-500 ring-2 ring-blue-500/30',
         isHighlighted && 'border-red-500 bg-red-500/10 ring-2 ring-red-500/50',
         isDropTarget &&
           'border-green-500 border-dashed bg-green-500/10 ring-2 ring-green-500/50',
-        !selected && !isHighlighted && !isDropTarget && 'border-border'
+        !selected && !isHighlighted && !isDropTarget && !useCustomColor && 'border-border'
       )}
+      style={useCustomColor ? {
+        borderColor: selected ? customColor : `color-mix(in oklch, ${customColor} 60%, var(--border))`,
+        backgroundColor: `color-mix(in oklch, ${customColor} 8%, var(--card))`,
+        ...(selected ? { boxShadow: `0 0 0 3px color-mix(in oklch, ${customColor} 30%, transparent)` } : {}),
+      } : undefined}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

@@ -2,6 +2,16 @@ import type { StateBlock } from './state';
 import type { Transition } from './transition';
 import type { Variable } from './variable';
 
+export interface AnnotationData {
+  id: string;
+  content: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  color: string | null;
+  image: string | null;
+  fontSize: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -13,6 +23,7 @@ export interface Project {
   states: StateBlock[];
   transitions: Transition[];
   variables: Variable[];
+  annotations?: AnnotationData[];
 }
 
 export interface ProjectSettings {

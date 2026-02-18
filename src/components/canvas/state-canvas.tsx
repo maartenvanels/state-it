@@ -8,6 +8,7 @@ import {
   MiniMap,
   BackgroundVariant,
   ConnectionMode,
+  SelectionMode,
   useReactFlow,
   type Connection,
   type NodeMouseHandler,
@@ -21,6 +22,7 @@ import { useProjectStore } from '@/lib/store/project-store';
 import { StateNode } from './state-node';
 import { TransitionEdge } from './transition-edge';
 import { DefaultTransitionNode } from './default-transition-node';
+import { AnnotationNode } from './annotation-node';
 import { CanvasContextMenu } from './canvas-context-menu';
 import type { TransitionEdge as TransitionEdgeType, CanvasNode } from '@/lib/types/canvas';
 import { snapToGrid, isDescendantOf, getNodeSize } from '@/lib/utils/geometry';
@@ -30,6 +32,7 @@ import { SimulationToolbar } from './simulation-toolbar';
 const nodeTypes: Record<string, any> = {
   stateNode: StateNode,
   defaultTransition: DefaultTransitionNode,
+  annotationNode: AnnotationNode,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -123,6 +126,12 @@ export function StateCanvas() {
     (_event, draggedNode) => {
       if (draggedNode.type !== 'stateNode') return;
 
+      // Skip nesting logic when multiple nodes are selected
+      if (selectedNodeIds.length > 1) {
+        clearDragHighlights();
+        return;
+      }
+
       const intersecting = getIntersectingNodes(draggedNode as Node);
       const draggedSize = getNodeSize(draggedNode as CanvasNode);
 
@@ -169,7 +178,7 @@ export function StateCanvas() {
       dropTargetRef.current = bestParent?.id ?? null;
       setDragHighlights(bestParent?.id ?? null, collidingIds);
     },
-    [nodes, getIntersectingNodes, setDragHighlights]
+    [nodes, getIntersectingNodes, setDragHighlights, selectedNodeIds, clearDragHighlights]
   );
 
   const handleNodeDragStop: NodeMouseHandler = useCallback(
@@ -177,6 +186,12 @@ export function StateCanvas() {
       const targetId = dropTargetRef.current;
       clearDragHighlights();
       dropTargetRef.current = null;
+
+      // Skip nesting logic when multiple nodes are dragged
+      if (selectedNodeIds.length > 1) {
+        useProjectStore.getState().markDirty();
+        return;
+      }
 
       if (draggedNode.type !== 'stateNode') {
         useProjectStore.getState().markDirty();
@@ -195,7 +210,7 @@ export function StateCanvas() {
 
       useProjectStore.getState().markDirty();
     },
-    [nestNode, unnestNode, clearDragHighlights]
+    [nestNode, unnestNode, clearDragHighlights, selectedNodeIds]
   );
 
   const handleConnectStart = useCallback(() => {
@@ -309,6 +324,7 @@ export function StateCanvas() {
     };
   }, [zoomIn, zoomOut, fitView]);
 
+  const isSelectMode = interactionMode === 'select';
   const cursorClass =
     interactionMode === 'addState' ? 'cursor-crosshair' : '';
 
@@ -367,6 +383,9 @@ export function StateCanvas() {
           snapGrid={[gridSize, gridSize]}
           fitView
           selectNodesOnDrag={false}
+          selectionOnDrag={isSelectMode}
+          panOnDrag={isSelectMode ? [1, 2] : true}
+          selectionMode={SelectionMode.Partial}
           nodeDragThreshold={2}
           deleteKeyCode={null}
           zIndexMode="auto"
@@ -387,7 +406,17 @@ export function StateCanvas() {
           />
           <MiniMap
             className="!bg-background !border-border"
-            nodeColor="var(--muted)"
+            nodeColor={(node) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const data = node.data as any;
+              if (node.type === 'stateNode' && data?.stateBlock?.color) {
+                return data.stateBlock.color;
+              }
+              if (node.type === 'annotationNode') {
+                return data?.color ?? '#fef08a';
+              }
+              return 'var(--muted)';
+            }}
             maskColor="color-mix(in oklch, var(--background) 70%, transparent)"
             pannable
             zoomable

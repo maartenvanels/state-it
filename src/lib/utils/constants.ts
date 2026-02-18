@@ -38,3 +38,31 @@ export const COLORS = {
   dropTarget: 'hsl(142, 71%, 45%)',
   defaultBorder: 'var(--border)',
 };
+
+export const STATE_COLORS = [
+  { name: 'Default', value: null },
+  { name: 'Red', value: '#ef4444' },
+  { name: 'Orange', value: '#f97316' },
+  { name: 'Amber', value: '#f59e0b' },
+  { name: 'Yellow', value: '#eab308' },
+  { name: 'Lime', value: '#84cc16' },
+  { name: 'Green', value: '#22c55e' },
+  { name: 'Teal', value: '#14b8a6' },
+  { name: 'Cyan', value: '#06b6d4' },
+  { name: 'Blue', value: '#3b82f6' },
+  { name: 'Purple', value: '#a855f7' },
+  { name: 'Pink', value: '#ec4899' },
+] as const;
+
+export const ANNOTATION_COLORS = [
+  { name: 'Yellow', value: '#fef08a' },
+  { name: 'Green', value: '#bbf7d0' },
+  { name: 'Blue', value: '#bfdbfe' },
+  { name: 'Pink', value: '#fbcfe8' },
+  { name: 'Orange', value: '#fed7aa' },
+  { name: 'Purple', value: '#e9d5ff' },
+] as const;
+
+export const DEFAULT_ANNOTATION_SIZE = { width: 200, height: 150 };
+export const MIN_ANNOTATION_WIDTH = 100;
+export const MIN_ANNOTATION_HEIGHT = 60;

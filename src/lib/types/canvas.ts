@@ -25,15 +25,25 @@ export interface DefaultTransitionNodeData {
   [key: string]: unknown;
 }
 
+export interface AnnotationNodeData {
+  content: string;
+  color: string | null;
+  image: string | null;
+  fontSize: number;
+  [key: string]: unknown;
+}
+
 export type StateNode = Node<StateNodeData, 'stateNode'>;
 export type DefaultTransitionNode = Node<DefaultTransitionNodeData, 'defaultTransition'>;
+export type AnnotationNode = Node<AnnotationNodeData, 'annotationNode'>;
 export type TransitionEdge = Edge<TransitionEdgeData>;
 
-export type CanvasNode = StateNode | DefaultTransitionNode;
+export type CanvasNode = StateNode | DefaultTransitionNode | AnnotationNode;
 
 export const NODE_TYPES = {
   stateNode: 'stateNode',
   defaultTransition: 'defaultTransition',
+  annotationNode: 'annotationNode',
 } as const;
 
 export const EDGE_TYPES = {

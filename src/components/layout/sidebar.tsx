@@ -11,7 +11,9 @@ import {
   ChevronRight,
   ChevronDown,
   BookOpen,
+  StickyNote,
 } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 import type { CanvasNode } from '@/lib/types/canvas';
 import { VariableTable } from '@/components/panels/variable-table';
 import { HelpPanel } from '@/components/panels/help-panel';
@@ -21,10 +23,13 @@ export function Sidebar() {
   const setLeftPanelTab = useUIStore((s) => s.setLeftPanelTab);
   const nodes = useCanvasStore((s) => s.nodes);
 
+  const selectedNodeIds = useUIStore((s) => s.selectedNodeIds);
+  const setSelection = useUIStore((s) => s.setSelection);
   const stateNodes = nodes.filter((n) => n.type === 'stateNode');
   const rootNodes = stateNodes.filter(
     (n) => n.type === 'stateNode' && !n.data.stateBlock.parentId
   );
+  const annotationNodes = nodes.filter((n) => n.type === 'annotationNode');
 
   return (
     <div className="flex h-full flex-col">
@@ -65,6 +70,37 @@ export function Sidebar() {
                 ))}
               </div>
             )}
+            {annotationNodes.length > 0 && (
+              <>
+                <Separator className="my-2" />
+                <div className="px-1 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                  Annotations ({annotationNodes.length})
+                </div>
+                <div className="space-y-0.5">
+                  {annotationNodes.map((node) => (
+                    <button
+                      key={node.id}
+                      className={`flex w-full items-center rounded px-2 py-1 text-left text-xs transition-colors hover:bg-accent ${
+                        selectedNodeIds.includes(node.id)
+                          ? 'bg-accent text-accent-foreground font-medium'
+                          : ''
+                      }`}
+                      onClick={() => setSelection([node.id], [])}
+                    >
+                      <StickyNote
+                        className="mr-1.5 h-3 w-3 flex-shrink-0"
+                        style={{ color: node.type === 'annotationNode' ? (node.data.color ?? '#fef08a') : undefined }}
+                      />
+                      <span className="truncate">
+                        {node.type === 'annotationNode'
+                          ? (node.data.content?.split('\n')[0]?.slice(0, 30) || 'Empty note')
+                          : ''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </ScrollArea>
         </TabsContent>
 
@@ -97,6 +133,7 @@ function StateTreeItem({ node, depth }: { node: CanvasNode; depth: number }) {
   const isSelected = selectedNodeIds.includes(node.id);
   const isDefault = node.data.stateBlock.isDefault;
   const isParallel = node.data.stateBlock.decomposition === 'parallel';
+  const nodeColor = node.data.stateBlock.color;
 
   return (
     <div>
@@ -128,7 +165,11 @@ function StateTreeItem({ node, depth }: { node: CanvasNode; depth: number }) {
         <div
           className={`mr-1.5 h-3 w-3 rounded-sm border flex-shrink-0 ${
             isParallel ? 'border-dashed' : 'border-solid'
-          } ${isDefault ? 'border-blue-500 bg-blue-500/20' : 'border-foreground/50'}`}
+          } ${!nodeColor && isDefault ? 'border-blue-500 bg-blue-500/20' : !nodeColor ? 'border-foreground/50' : ''}`}
+          style={nodeColor ? {
+            borderColor: nodeColor,
+            backgroundColor: `color-mix(in oklch, ${nodeColor} 30%, transparent)`,
+          } : undefined}
         />
 
         <span className="truncate">{node.data.stateBlock.name}</span>

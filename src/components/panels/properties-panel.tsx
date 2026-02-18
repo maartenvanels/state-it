@@ -5,6 +5,7 @@ import { useCanvasStore } from '@/lib/store/canvas-store';
 import { Settings2 } from 'lucide-react';
 import { StateProperties } from './state-properties';
 import { TransitionProperties } from './transition-properties';
+import { AnnotationProperties } from './annotation-properties';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 export function PropertiesPanel() {
@@ -27,6 +28,14 @@ export function PropertiesPanel() {
     return (
       <ScrollArea className="h-full">
         <StateProperties nodeId={selectedNode.id} data={selectedNode.data} />
+      </ScrollArea>
+    );
+  }
+
+  if (selectedNode && selectedNode.type === 'annotationNode') {
+    return (
+      <ScrollArea className="h-full">
+        <AnnotationProperties nodeId={selectedNode.id} data={selectedNode.data} />
       </ScrollArea>
     );
   }
