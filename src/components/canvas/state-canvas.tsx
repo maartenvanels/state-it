@@ -32,6 +32,7 @@ import { CanvasContextMenu } from './canvas-context-menu';
 import type { TransitionEdge as TransitionEdgeType, CanvasNode } from '@/lib/types/canvas';
 import { snapToGrid, isDescendantOf, getNodeSize } from '@/lib/utils/geometry';
 import { SimulationToolbar } from './simulation-toolbar';
+import { SystemSimulationToolbar } from './system-simulation-toolbar';
 import { generateId } from '@/lib/utils/id-generator';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -444,6 +445,7 @@ export function StateCanvas() {
       <div ref={reactFlowWrapper} className={`h-full w-full ${cursorClass} relative`}>
         {svgDefs}
         {!isSystemView && <SimulationToolbar />}
+        {isSystemView && <SystemSimulationToolbar />}
         <ReactFlow
           nodes={nodes}
           edges={edges}

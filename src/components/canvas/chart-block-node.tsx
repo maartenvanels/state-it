@@ -1,10 +1,12 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { Handle, Position, NodeResizer } from '@xyflow/react';
 import type { NodeProps, Node } from '@xyflow/react';
 import type { ChartBlockNodeData } from '@/lib/types/canvas';
 import { useNavigationStore } from '@/lib/store/navigation-store';
+import { useProjectStore } from '@/lib/store/project-store';
+import { useSystemSimulationStore } from '@/lib/store/system-simulation-store';
 import { cn } from '@/lib/utils';
 
 type ChartBlockNodeType = Node<ChartBlockNodeData, 'chartBlock'>;
@@ -15,10 +17,22 @@ function ChartBlockNodeComponent({
   selected,
 }: NodeProps<ChartBlockNodeType>) {
   const navigateToChart = useNavigationStore((s) => s.navigateToChart);
+  const isSimActive = useSystemSimulationStore((s) => s.isActive);
+  const activeStateId = useSystemSimulationStore(
+    (s) => s.chartActiveStates[id]
+  );
+  const chart = useProjectStore((s) =>
+    s.currentProject?.charts.find((c) => c.id === data.chartId)
+  );
+
+  const activeStateName = useMemo(() => {
+    if (!activeStateId || !chart) return null;
+    const state = chart.states.find((s) => s.id === activeStateId);
+    return state?.name ?? null;
+  }, [activeStateId, chart]);
 
   const inputPorts = data.ports.filter((p) => p.direction === 'input');
   const outputPorts = data.ports.filter((p) => p.direction === 'output');
-  const maxPorts = Math.max(inputPorts.length, outputPorts.length, 1);
 
   return (
     <>
@@ -33,7 +47,11 @@ function ChartBlockNodeComponent({
       <div
         className={cn(
           'flex flex-col h-full border-2 rounded-lg bg-background shadow-sm overflow-hidden',
-          selected ? 'border-primary' : 'border-border'
+          isSimActive
+            ? 'border-blue-400 ring-1 ring-blue-400/30'
+            : selected
+              ? 'border-primary'
+              : 'border-border'
         )}
         onDoubleClick={() => navigateToChart(data.chartId)}
       >
@@ -69,10 +87,19 @@ function ChartBlockNodeComponent({
         </div>
 
         {/* Empty state hint */}
-        {inputPorts.length === 0 && outputPorts.length === 0 && (
+        {inputPorts.length === 0 && outputPorts.length === 0 && !isSimActive && (
           <div className="flex-1 flex items-center justify-center">
             <span className="text-[10px] text-muted-foreground/50">
               Double-click to edit
+            </span>
+          </div>
+        )}
+
+        {/* Active state during simulation */}
+        {isSimActive && activeStateName && (
+          <div className="border-t px-2 py-1 text-center">
+            <span className="text-[10px] text-blue-500 font-mono font-semibold">
+              {activeStateName}
             </span>
           </div>
         )}

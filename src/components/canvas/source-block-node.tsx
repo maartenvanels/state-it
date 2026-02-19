@@ -5,17 +5,23 @@ import { Handle, Position, NodeResizer } from '@xyflow/react';
 import type { NodeProps, Node } from '@xyflow/react';
 import type { SourceBlockNodeData } from '@/lib/types/canvas';
 import type { ConstantConfig, SignalGeneratorConfig } from '@/lib/types/system';
+import { useSystemSimulationStore } from '@/lib/store/system-simulation-store';
 import { cn } from '@/lib/utils';
 import { Hash, Activity } from 'lucide-react';
 
 type SourceBlockNodeType = Node<SourceBlockNodeData, 'sourceBlock'>;
 
 function SourceBlockNodeComponent({
+  id,
   data,
   selected,
 }: NodeProps<SourceBlockNodeType>) {
   const isConstant = data.blockType === 'constant';
   const config = data.config as unknown as ConstantConfig | SignalGeneratorConfig;
+  const isSimActive = useSystemSimulationStore((s) => s.isActive);
+  const outputValue = useSystemSimulationStore(
+    (s) => s.portValues[id]?.['output']
+  );
 
   return (
     <>
@@ -30,7 +36,11 @@ function SourceBlockNodeComponent({
       <div
         className={cn(
           'flex flex-col h-full border-2 rounded-lg bg-background shadow-sm overflow-hidden',
-          selected ? 'border-emerald-500' : 'border-border'
+          isSimActive
+            ? 'border-emerald-400 ring-1 ring-emerald-400/30'
+            : selected
+              ? 'border-emerald-500'
+              : 'border-border'
         )}
       >
         {/* Header */}
@@ -46,15 +56,27 @@ function SourceBlockNodeComponent({
         {/* Body */}
         <div className="flex-1 flex items-center justify-center px-2 py-1">
           {isConstant ? (
-            <span className="text-sm font-mono font-medium">
-              {(config as ConstantConfig).value}
-            </span>
+            <div className="flex flex-col items-center">
+              <span className="text-sm font-mono font-medium">
+                {(config as ConstantConfig).value}
+              </span>
+              {isSimActive && outputValue !== undefined && (
+                <span className="text-[10px] text-emerald-500 font-mono">
+                  = {outputValue.toFixed(2)}
+                </span>
+              )}
+            </div>
           ) : (
             <div className="flex flex-col items-center text-[10px] text-muted-foreground">
               <span className="capitalize">
                 {(config as SignalGeneratorConfig).waveform}
               </span>
               <span>{(config as SignalGeneratorConfig).frequency} Hz</span>
+              {isSimActive && outputValue !== undefined && (
+                <span className="text-emerald-500 font-mono">
+                  = {outputValue.toFixed(2)}
+                </span>
+              )}
             </div>
           )}
         </div>
