@@ -24,9 +24,14 @@ export function AnnotationProperties({
   const [content, setContent] = useState(data.content);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  const [prevNodeId, setPrevNodeId] = useState(nodeId);
+  const [prevContent, setPrevContent] = useState(data.content);
+
+  if (nodeId !== prevNodeId || data.content !== prevContent) {
+    setPrevNodeId(nodeId);
+    setPrevContent(data.content);
     setContent(data.content);
-  }, [nodeId, data.content]);
+  }
 
   const handleContentBlur = useCallback(() => {
     if (content !== data.content) {

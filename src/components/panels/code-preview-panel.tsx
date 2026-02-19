@@ -212,7 +212,7 @@ function tokenizeCLine(line: string): { text: string; className: string }[] {
   const C_TYPES = /\b(bool|int8_t|int16_t|int32_t|uint8_t|uint16_t|uint32_t|float|double|char)\b/g;
 
   const result: { text: string; className: string }[] = [];
-  let remaining = line;
+  const remaining = line;
 
   // Check for inline comments
   const commentIdx = remaining.indexOf('/*');

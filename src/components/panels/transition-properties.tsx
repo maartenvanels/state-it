@@ -32,13 +32,17 @@ export function TransitionProperties({
     data.label.transitionAction ?? ''
   );
 
-  // Sync state when selection changes
-  useEffect(() => {
+  const [prevEdgeId, setPrevEdgeId] = useState(edgeId);
+  const [prevLabel, setPrevLabel] = useState(data.label);
+
+  if (edgeId !== prevEdgeId || data.label !== prevLabel) {
+    setPrevEdgeId(edgeId);
+    setPrevLabel(data.label);
     setEvent(data.label.event ?? '');
     setCondition(data.label.condition ?? '');
     setConditionAction(data.label.conditionAction ?? '');
     setTransitionAction(data.label.transitionAction ?? '');
-  }, [edgeId, data.label]);
+  }
 
   const commitChanges = useCallback(() => {
     updateTransitionEdge(edgeId, {
@@ -77,8 +81,8 @@ export function TransitionProperties({
       : undefined;
   const siblingCount = currentEdge
     ? edges.filter(
-        (e) => e.source === currentEdge.source && e.data && !e.data.isDefault
-      ).length
+      (e) => e.source === currentEdge.source && e.data && !e.data.isDefault
+    ).length
     : 0;
 
   const preview = formatTransitionLabel({

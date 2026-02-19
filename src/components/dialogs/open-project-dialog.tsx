@@ -40,12 +40,15 @@ export function OpenProjectDialog({
   const setCurrentProject = useProjectStore((s) => s.setCurrentProject);
   const currentProject = useProjectStore((s) => s.currentProject);
 
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(open);
+
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) {
       setProjects(getProjectMetaList());
       setSelectedId(null);
     }
-  }, [open]);
+  }
 
   const flushAndSaveCurrent = () => {
     if (!currentProject) return;
@@ -141,11 +144,10 @@ export function OpenProjectDialog({
               {projects.map((p) => (
                 <button
                   key={p.id}
-                  className={`w-full flex items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent ${
-                    selectedId === p.id
-                      ? 'bg-accent text-accent-foreground'
-                      : ''
-                  }`}
+                  className={`w-full flex items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent ${selectedId === p.id
+                    ? 'bg-accent text-accent-foreground'
+                    : ''
+                    }`}
                   onClick={() => setSelectedId(p.id)}
                   onDoubleClick={() => {
                     setSelectedId(p.id);

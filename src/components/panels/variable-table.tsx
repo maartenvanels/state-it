@@ -82,7 +82,8 @@ export function VariableTable() {
     if (newRowId && newNameRef.current) {
       newNameRef.current.focus();
       newNameRef.current.select();
-      setNewRowId(null);
+      const timer = setTimeout(() => setNewRowId(null), 0);
+      return () => clearTimeout(timer);
     }
   }, [newRowId, variables]);
 
@@ -194,11 +195,15 @@ function VariableRow({
   const [localInit, setLocalInit] = useState(variable.initialValue);
   const [nameError, setNameError] = useState(false);
 
-  // Sync from store when variable changes externally
-  useEffect(() => {
+  const [prevVarName, setPrevVarName] = useState(variable.name);
+  const [prevVarInit, setPrevVarInit] = useState(variable.initialValue);
+
+  if (variable.name !== prevVarName || variable.initialValue !== prevVarInit) {
+    setPrevVarName(variable.name);
+    setPrevVarInit(variable.initialValue);
     setLocalName(variable.name);
     setLocalInit(variable.initialValue);
-  }, [variable.name, variable.initialValue]);
+  }
 
   const commitName = useCallback(() => {
     const trimmed = localName.trim();
@@ -284,11 +289,10 @@ function VariableRow({
               }}
               onBlur={commitName}
               onKeyDown={(e) => handleKeyDown(e, commitName)}
-              className={`w-full bg-transparent outline-none text-[10px] font-mono font-medium px-0.5 rounded ${
-                nameError
-                  ? 'ring-1 ring-destructive text-destructive'
-                  : 'focus:ring-1 focus:ring-ring'
-              }`}
+              className={`w-full bg-transparent outline-none text-[10px] font-mono font-medium px-0.5 rounded ${nameError
+                ? 'ring-1 ring-destructive text-destructive'
+                : 'focus:ring-1 focus:ring-ring'
+                }`}
               spellCheck={false}
             />
           </div>
@@ -361,10 +365,15 @@ function ExpandedDetailRow({
     variable.enumValues?.join(', ') ?? ''
   );
 
-  useEffect(() => {
+  const [prevDesc, setPrevDesc] = useState(variable.description);
+  const [prevEnum, setPrevEnum] = useState(variable.enumValues);
+
+  if (variable.description !== prevDesc || variable.enumValues !== prevEnum) {
+    setPrevDesc(variable.description);
+    setPrevEnum(variable.enumValues);
     setLocalDesc(variable.description);
     setLocalEnum(variable.enumValues?.join(', ') ?? '');
-  }, [variable.description, variable.enumValues]);
+  }
 
   const commitDesc = useCallback(() => {
     const trimmed = localDesc.trim();

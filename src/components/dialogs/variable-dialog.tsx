@@ -68,7 +68,12 @@ export function VariableDialog({
   const [enumValues, setEnumValues] = useState('');
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const [prevEditVar, setPrevEditVar] = useState(editVariable);
+  const [prevOpen, setPrevOpen] = useState(open);
+
+  if (editVariable !== prevEditVar || open !== prevOpen) {
+    setPrevEditVar(editVariable);
+    setPrevOpen(open);
     if (editVariable) {
       setName(editVariable.name);
       setScope(editVariable.scope);
@@ -85,7 +90,7 @@ export function VariableDialog({
       setEnumValues('');
     }
     setError('');
-  }, [editVariable, open]);
+  }
 
   const handleSubmit = () => {
     // Validate name
@@ -106,11 +111,11 @@ export function VariableDialog({
       description: description.trim(),
       ...(dataType === 'enum' && enumValues.trim()
         ? {
-            enumValues: enumValues
-              .split(',')
-              .map((v) => v.trim())
-              .filter(Boolean),
-          }
+          enumValues: enumValues
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean),
+        }
         : {}),
     };
 

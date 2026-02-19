@@ -35,10 +35,14 @@ export function StateProperties({ nodeId, data }: StatePropertiesProps) {
   const updateStateNodeData = useCanvasStore((s) => s.updateStateNodeData);
   const [name, setName] = useState(stateBlock.name);
 
-  // Sync name when selection changes
-  useEffect(() => {
+  const [prevNodeId, setPrevNodeId] = useState(nodeId);
+  const [prevStoreName, setPrevStoreName] = useState(stateBlock.name);
+
+  if (nodeId !== prevNodeId || stateBlock.name !== prevStoreName) {
+    setPrevNodeId(nodeId);
+    setPrevStoreName(stateBlock.name);
     setName(stateBlock.name);
-  }, [nodeId, stateBlock.name]);
+  }
 
   const handleNameBlur = useCallback(() => {
     if (name.trim() && name !== stateBlock.name) {
