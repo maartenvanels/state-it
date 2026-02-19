@@ -25,6 +25,8 @@ import type { CanvasNode } from '@/lib/types/canvas';
 import { VariableTable } from '@/components/panels/variable-table';
 import { HelpPanel } from '@/components/panels/help-panel';
 
+const EMPTY_ARRAY: never[] = [];
+
 export function Sidebar() {
   const leftPanelTab = useUIStore((s) => s.leftPanelTab);
   const setLeftPanelTab = useUIStore((s) => s.setLeftPanelTab);
@@ -220,8 +222,8 @@ function StateTreeItem({ node, depth }: { node: CanvasNode; depth: number }) {
 }
 
 function SystemBlockListPanel() {
-  const charts = useProjectStore((s) => s.currentProject?.charts ?? []);
-  const blocks = useProjectStore((s) => s.currentProject?.systemBlocks ?? []);
+  const charts = useProjectStore((s) => s.currentProject?.charts ?? EMPTY_ARRAY);
+  const blocks = useProjectStore((s) => s.currentProject?.systemBlocks ?? EMPTY_ARRAY);
   const navigateToChart = useNavigationStore((s) => s.navigateToChart);
   const selectedNodeIds = useUIStore((s) => s.selectedNodeIds);
   const setSelection = useUIStore((s) => s.setSelection);

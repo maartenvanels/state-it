@@ -38,14 +38,16 @@ const SCOPE_COLORS: Record<VariableScope, string> = {
 
 const NAME_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
+const EMPTY_ARRAY: never[] = [];
+
 export function VariableTable() {
   const chartId = useNavigationStore((s) =>
     s.activeView.type === 'chart' ? s.activeView.chartId : null
   );
   const variables = useProjectStore((s) => {
-    if (!chartId || !s.currentProject) return [];
+    if (!chartId || !s.currentProject) return EMPTY_ARRAY;
     const chart = s.currentProject.charts.find((c) => c.id === chartId);
-    return chart?.variables ?? [];
+    return chart?.variables ?? EMPTY_ARRAY;
   });
   const addVariableStore = useProjectStore((s) => s.addVariable);
   const updateVariableStore = useProjectStore((s) => s.updateVariable);

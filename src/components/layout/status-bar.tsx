@@ -8,6 +8,8 @@ import { useMemo } from 'react';
 import { buildModel } from '@/lib/codegen/model-builder';
 import { validateModel } from '@/lib/codegen/validator';
 
+const EMPTY_ARRAY: never[] = [];
+
 export function StatusBar() {
   const viewport = useCanvasStore((s) => s.viewport);
   const nodes = useCanvasStore((s) => s.nodes);
@@ -19,9 +21,9 @@ export function StatusBar() {
   const activeView = useNavigationStore((s) => s.activeView);
   const chartId = activeView.type === 'chart' ? activeView.chartId : null;
   const variables = useProjectStore((s) => {
-    if (!chartId || !s.currentProject) return [];
+    if (!chartId || !s.currentProject) return EMPTY_ARRAY;
     const chart = s.currentProject.charts.find((c) => c.id === chartId);
-    return chart?.variables ?? [];
+    return chart?.variables ?? EMPTY_ARRAY;
   });
   const projectName = useProjectStore((s) => s.currentProject?.name ?? '');
   const viewLabel = useProjectStore((s) => {

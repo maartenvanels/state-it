@@ -10,6 +10,8 @@ import type { ScopeSample } from '@/lib/codegen/system-simulator';
 import { cn } from '@/lib/utils';
 import { LineChart, Monitor } from 'lucide-react';
 
+const EMPTY_SCOPE_DATA: never[] = [];
+
 type SinkBlockNodeType = Node<SinkBlockNodeData, 'sinkBlock'>;
 
 function formatDisplayValue(
@@ -130,7 +132,7 @@ function SinkBlockNodeComponent({
 
   const isSimActive = useSystemSimulationStore((s) => s.isActive);
   const scopeSamples = useSystemSimulationStore(
-    (s) => s.scopeData[id] ?? []
+    (s) => s.scopeData[id] ?? EMPTY_SCOPE_DATA
   );
   const displayValue = useSystemSimulationStore(
     (s) => s.displayValues[id] ?? 0

@@ -23,6 +23,8 @@ import {
   type SimulationContext,
 } from '@/lib/codegen/simulator';
 
+const EMPTY_ARRAY: never[] = [];
+
 export function SimulationToolbar() {
   const isActive = useSimulationStore((s) => s.isActive);
   const activeStateId = useSimulationStore((s) => s.activeStateId);
@@ -42,9 +44,9 @@ export function SimulationToolbar() {
     s.activeView.type === 'chart' ? s.activeView.chartId : null
   );
   const variables = useProjectStore((s) => {
-    if (!chartId || !s.currentProject) return [];
+    if (!chartId || !s.currentProject) return EMPTY_ARRAY;
     const chart = s.currentProject.charts.find((c) => c.id === chartId);
-    return chart?.variables ?? [];
+    return chart?.variables ?? EMPTY_ARRAY;
   });
 
   const model = useMemo(() => {

@@ -12,6 +12,8 @@ import { generateProject } from '@/lib/codegen/project-generator';
 import { downloadFile } from '@/lib/persistence/exporter';
 import type { GeneratedFile } from '@/lib/types/codegen';
 
+const EMPTY_ARRAY: never[] = [];
+
 export function CodePreviewPanel() {
   const preferredLanguage = useUIStore((s) => s.codePreviewLanguage);
   const nodes = useCanvasStore((s) => s.nodes);
@@ -21,9 +23,9 @@ export function CodePreviewPanel() {
     s.activeView.type === 'chart' ? s.activeView.chartId : null
   );
   const variables = useProjectStore((s) => {
-    if (!chartId || !s.currentProject) return [];
+    if (!chartId || !s.currentProject) return EMPTY_ARRAY;
     const chart = s.currentProject.charts.find((c) => c.id === chartId);
-    return chart?.variables ?? [];
+    return chart?.variables ?? EMPTY_ARRAY;
   });
   const chartName = useProjectStore((s) => {
     if (!chartId || !s.currentProject) return s.currentProject?.name ?? 'StateMachine';
