@@ -125,3 +125,23 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Landing page animations */
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.08; scale: 1; }
+  50% { opacity: 0.16; scale: 1.1; }
+}
+
+@keyframes grid-drift {
+  0% { background-position: 0 0, 0 0, 0 0, 0 0; }
+  100% { background-position: 100px 100px, 100px 100px, 20px 20px, 20px 20px; }
+}
+
+@layer utilities {
+  .animate-glow-pulse {
+    animation: glow-pulse 8s ease-in-out infinite;
+  }
+  .animate-grid-drift {
+    animation: grid-drift 60s linear infinite;
+  }
+}
