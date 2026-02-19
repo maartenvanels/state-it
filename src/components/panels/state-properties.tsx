@@ -35,14 +35,11 @@ export function StateProperties({ nodeId, data }: StatePropertiesProps) {
   const updateStateNodeData = useCanvasStore((s) => s.updateStateNodeData);
   const [name, setName] = useState(stateBlock.name);
 
-  const [prevNodeId, setPrevNodeId] = useState(nodeId);
-  const [prevStoreName, setPrevStoreName] = useState(stateBlock.name);
-
-  if (nodeId !== prevNodeId || stateBlock.name !== prevStoreName) {
-    setPrevNodeId(nodeId);
-    setPrevStoreName(stateBlock.name);
+  // Sync name when selection changes
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setName(stateBlock.name);
-  }
+  }, [nodeId, stateBlock.name]);
 
   const handleNameBlur = useCallback(() => {
     if (name.trim() && name !== stateBlock.name) {

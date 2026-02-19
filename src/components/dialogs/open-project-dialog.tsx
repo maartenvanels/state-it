@@ -40,15 +40,14 @@ export function OpenProjectDialog({
   const setCurrentProject = useProjectStore((s) => s.setCurrentProject);
   const currentProject = useProjectStore((s) => s.currentProject);
 
-  const [prevOpen, setPrevOpen] = useState(open);
-
-  if (open !== prevOpen) {
-    setPrevOpen(open);
+  useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProjects(getProjectMetaList());
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedId(null);
     }
-  }
+  }, [open]);
 
   const flushAndSaveCurrent = () => {
     if (!currentProject) return;

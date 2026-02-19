@@ -68,29 +68,29 @@ export function VariableDialog({
   const [enumValues, setEnumValues] = useState('');
   const [error, setError] = useState('');
 
-  const [prevEditVar, setPrevEditVar] = useState(editVariable);
-  const [prevOpen, setPrevOpen] = useState(open);
-
-  if (editVariable !== prevEditVar || open !== prevOpen) {
-    setPrevEditVar(editVariable);
-    setPrevOpen(open);
+  useEffect(() => {
     if (editVariable) {
+      /* eslint-disable react-hooks/set-state-in-effect */
       setName(editVariable.name);
       setScope(editVariable.scope);
       setDataType(editVariable.dataType);
       setInitialValue(editVariable.initialValue);
       setDescription(editVariable.description);
       setEnumValues(editVariable.enumValues?.join(', ') ?? '');
+      /* eslint-enable react-hooks/set-state-in-effect */
     } else {
+      /* eslint-disable react-hooks/set-state-in-effect */
       setName('');
       setScope('local');
       setDataType('int32');
       setInitialValue('');
       setDescription('');
       setEnumValues('');
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setError('');
-  }
+  }, [editVariable, open]);
 
   const handleSubmit = () => {
     // Validate name

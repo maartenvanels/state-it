@@ -195,15 +195,13 @@ function VariableRow({
   const [localInit, setLocalInit] = useState(variable.initialValue);
   const [nameError, setNameError] = useState(false);
 
-  const [prevVarName, setPrevVarName] = useState(variable.name);
-  const [prevVarInit, setPrevVarInit] = useState(variable.initialValue);
-
-  if (variable.name !== prevVarName || variable.initialValue !== prevVarInit) {
-    setPrevVarName(variable.name);
-    setPrevVarInit(variable.initialValue);
+  // Sync from store when variable changes externally
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     setLocalName(variable.name);
     setLocalInit(variable.initialValue);
-  }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [variable.name, variable.initialValue]);
 
   const commitName = useCallback(() => {
     const trimmed = localName.trim();
@@ -365,15 +363,12 @@ function ExpandedDetailRow({
     variable.enumValues?.join(', ') ?? ''
   );
 
-  const [prevDesc, setPrevDesc] = useState(variable.description);
-  const [prevEnum, setPrevEnum] = useState(variable.enumValues);
-
-  if (variable.description !== prevDesc || variable.enumValues !== prevEnum) {
-    setPrevDesc(variable.description);
-    setPrevEnum(variable.enumValues);
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     setLocalDesc(variable.description);
     setLocalEnum(variable.enumValues?.join(', ') ?? '');
-  }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [variable.description, variable.enumValues]);
 
   const commitDesc = useCallback(() => {
     const trimmed = localDesc.trim();

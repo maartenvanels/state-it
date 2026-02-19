@@ -32,17 +32,13 @@ export function TransitionProperties({
     data.label.transitionAction ?? ''
   );
 
-  const [prevEdgeId, setPrevEdgeId] = useState(edgeId);
-  const [prevLabel, setPrevLabel] = useState(data.label);
-
-  if (edgeId !== prevEdgeId || data.label !== prevLabel) {
-    setPrevEdgeId(edgeId);
-    setPrevLabel(data.label);
+  // Sync state when selection changes
+  useEffect(() => {
     setEvent(data.label.event ?? '');
     setCondition(data.label.condition ?? '');
     setConditionAction(data.label.conditionAction ?? '');
     setTransitionAction(data.label.transitionAction ?? '');
-  }
+  }, [edgeId, data.label]);
 
   const commitChanges = useCallback(() => {
     updateTransitionEdge(edgeId, {
