@@ -23,6 +23,16 @@ import { EMPTY_TRANSITION_LABEL } from '../types/transition';
 import { DEFAULT_STATE_ACTIONS, DEFAULT_STATE_SIZE } from '../types/state';
 import { DEFAULT_ANNOTATION_SIZE } from '../utils/constants';
 import { generateId } from '../utils/id-generator';
+import {
+  calcAlignedPositions,
+  calcDistributedPositions,
+  calcMatchedSize,
+  getAbsolutePosition,
+  getNodeSize,
+  type AlignDirection,
+  type DistributeAxis,
+  type MatchDimension,
+} from '../utils/geometry';
 
 interface CanvasState {
   nodes: CanvasNode[];
@@ -74,6 +84,11 @@ interface CanvasActions {
   onReconnect: (oldEdge: TransitionEdge, newConnection: Connection) => void;
 
   setViewport: (viewport: Viewport) => void;
+
+  alignNodes: (nodeIds: string[], direction: AlignDirection) => void;
+  distributeNodes: (nodeIds: string[], axis: DistributeAxis) => void;
+  matchNodeSizes: (nodeIds: string[], dimension: MatchDimension) => void;
+  groupNodesIntoState: (nodeIds: string[]) => string | null;
 
   setNodes: (nodes: CanvasNode[]) => void;
   setEdges: (edges: TransitionEdge[]) => void;
@@ -437,6 +452,161 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
             get().edges
           ) as TransitionEdge[],
         });
+      },
+
+      alignNodes: (nodeIds, direction) => {
+        const positions = calcAlignedPositions(nodeIds, get().nodes, direction);
+        if (positions.size === 0) return;
+        set({
+          nodes: get().nodes.map((node) => {
+            const newPos = positions.get(node.id);
+            if (!newPos) return node;
+            if (node.type === 'stateNode') {
+              return {
+                ...node,
+                position: newPos,
+                data: {
+                  ...node.data,
+                  stateBlock: { ...node.data.stateBlock, position: newPos },
+                },
+              } as StateNode;
+            }
+            return { ...node, position: newPos } as CanvasNode;
+          }),
+        });
+      },
+
+      distributeNodes: (nodeIds, axis) => {
+        const positions = calcDistributedPositions(nodeIds, get().nodes, axis);
+        if (positions.size === 0) return;
+        set({
+          nodes: get().nodes.map((node) => {
+            const newPos = positions.get(node.id);
+            if (!newPos) return node;
+            if (node.type === 'stateNode') {
+              return {
+                ...node,
+                position: newPos,
+                data: {
+                  ...node.data,
+                  stateBlock: { ...node.data.stateBlock, position: newPos },
+                },
+              } as StateNode;
+            }
+            return { ...node, position: newPos } as CanvasNode;
+          }),
+        });
+      },
+
+      matchNodeSizes: (nodeIds, dimension) => {
+        const target = calcMatchedSize(nodeIds, get().nodes, dimension);
+        if (!target) return;
+        const nodeIdSet = new Set(nodeIds);
+        set({
+          nodes: get().nodes.map((node) => {
+            if (!nodeIdSet.has(node.id)) return node;
+            const currentSize = getNodeSize(node);
+            const newWidth = target.width > 0 ? target.width : currentSize.width;
+            const newHeight = target.height > 0 ? target.height : currentSize.height;
+            if (node.type === 'stateNode') {
+              return {
+                ...node,
+                style: { ...node.style, width: newWidth, height: newHeight },
+                data: {
+                  ...node.data,
+                  stateBlock: {
+                    ...node.data.stateBlock,
+                    size: { width: newWidth, height: newHeight },
+                  },
+                },
+              } as StateNode;
+            }
+            return {
+              ...node,
+              style: { ...node.style, width: newWidth, height: newHeight },
+            } as CanvasNode;
+          }),
+        });
+      },
+
+      groupNodesIntoState: (nodeIds) => {
+        const nodes = get().nodes;
+        const targets = nodeIds
+          .map((id) => nodes.find((n) => n.id === id))
+          .filter((n): n is CanvasNode => !!n && n.type === 'stateNode');
+        if (targets.length < 2) return null;
+
+        // Calculate bounding box in absolute coords
+        const PADDING = 40;
+        const HEADER_HEIGHT = 32;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const node of targets) {
+          const abs = getAbsolutePosition(node, nodes);
+          const size = getNodeSize(node);
+          minX = Math.min(minX, abs.x);
+          minY = Math.min(minY, abs.y);
+          maxX = Math.max(maxX, abs.x + size.width);
+          maxY = Math.max(maxY, abs.y + size.height);
+        }
+
+        const groupWidth = maxX - minX + PADDING * 2;
+        const groupHeight = maxY - minY + PADDING + HEADER_HEIGHT + PADDING;
+        const groupPosition = { x: minX - PADDING, y: minY - HEADER_HEIGHT - PADDING };
+
+        // Create group state
+        const groupId = generateId();
+        const stateCount = nodes.filter((n) => n.type === 'stateNode').length;
+        const groupNode: StateNode = {
+          id: groupId,
+          type: 'stateNode',
+          position: groupPosition,
+          data: {
+            stateBlock: {
+              id: groupId,
+              name: `Group_${stateCount + 1}`,
+              parentId: null,
+              decomposition: 'exclusive',
+              position: groupPosition,
+              size: { width: groupWidth, height: groupHeight },
+              actions: { ...DEFAULT_STATE_ACTIONS },
+              isDefault: false,
+              executionOrder: 0,
+              color: null,
+            },
+            isHighlighted: false,
+            isDropTarget: false,
+            validationErrors: [],
+          },
+          style: { width: groupWidth, height: groupHeight },
+        };
+
+        // Re-parent selected nodes
+        const nodeIdSet = new Set(nodeIds);
+        const updatedNodes = nodes.map((node) => {
+          if (!nodeIdSet.has(node.id) || node.type !== 'stateNode') return node;
+          const abs = getAbsolutePosition(node, nodes);
+          const relPos = {
+            x: abs.x - groupPosition.x,
+            y: abs.y - groupPosition.y,
+          };
+          return {
+            ...node,
+            parentId: groupId,
+            extent: 'parent' as const,
+            position: relPos,
+            data: {
+              ...node.data,
+              stateBlock: {
+                ...node.data.stateBlock,
+                parentId: groupId,
+                position: relPos,
+              },
+            },
+          } as StateNode;
+        });
+
+        set({ nodes: [groupNode, ...updatedNodes] });
+        return groupId;
       },
 
       setViewport: (viewport) => set({ viewport }),
