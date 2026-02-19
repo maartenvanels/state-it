@@ -47,3 +47,15 @@ export interface GeneratedCode {
   header: string;
   source: string;
 }
+
+export interface GeneratedFile {
+  filename: string;
+  content: string;
+  language: 'c' | 'scl';
+  category?: 'header' | 'source' | 'types' | 'system' | 'scl';
+}
+
+export interface GeneratedProject {
+  files: GeneratedFile[];
+  messages: ValidationMessage[];
+}

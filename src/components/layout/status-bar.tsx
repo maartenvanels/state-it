@@ -3,6 +3,7 @@
 import { useCanvasStore } from '@/lib/store/canvas-store';
 import { useUIStore } from '@/lib/store/ui-store';
 import { useProjectStore } from '@/lib/store/project-store';
+import { useNavigationStore } from '@/lib/store/navigation-store';
 import { useMemo } from 'react';
 import { buildModel } from '@/lib/codegen/model-builder';
 import { validateModel } from '@/lib/codegen/validator';
@@ -15,8 +16,19 @@ export function StatusBar() {
   const selectedEdgeIds = useUIStore((s) => s.selectedEdgeIds);
   const interactionMode = useUIStore((s) => s.interactionMode);
   const isDirty = useProjectStore((s) => s.isDirty);
-  const variables = useProjectStore((s) => s.currentProject?.variables ?? []);
+  const activeView = useNavigationStore((s) => s.activeView);
+  const chartId = activeView.type === 'chart' ? activeView.chartId : null;
+  const variables = useProjectStore((s) => {
+    if (!chartId || !s.currentProject) return [];
+    const chart = s.currentProject.charts.find((c) => c.id === chartId);
+    return chart?.variables ?? [];
+  });
   const projectName = useProjectStore((s) => s.currentProject?.name ?? '');
+  const viewLabel = useProjectStore((s) => {
+    if (activeView.type === 'system') return 'System';
+    const chart = s.currentProject?.charts.find((c) => c.id === chartId);
+    return chart?.name ?? 'Chart';
+  });
 
   const stateCount = nodes.filter((n) => n.type === 'stateNode').length;
   const zoom = Math.round(viewport.zoom * 100);
@@ -53,6 +65,7 @@ export function StatusBar() {
         )}
       </div>
       <div className="flex items-center gap-4">
+        <span className="text-muted-foreground/60">{viewLabel}</span>
         {isDirty && (
           <span className="text-muted-foreground/60">Unsaved</span>
         )}

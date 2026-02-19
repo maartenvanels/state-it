@@ -1,88 +1,114 @@
 'use client';
 
-import { useMemo } from 'react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { useMemo, useState, useEffect } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { useUIStore } from '@/lib/store/ui-store';
 import { useCanvasStore } from '@/lib/store/canvas-store';
 import { useProjectStore } from '@/lib/store/project-store';
-import { Code2, Copy, AlertTriangle } from 'lucide-react';
-import { buildModel } from '@/lib/codegen/model-builder';
-import { validateModel } from '@/lib/codegen/validator';
-import { generateC } from '@/lib/codegen/c-generator';
-import { generateSCL } from '@/lib/codegen/scl-generator';
+import { useNavigationStore } from '@/lib/store/navigation-store';
+import { Code2, Copy, Download, AlertTriangle } from 'lucide-react';
+import { generateProject } from '@/lib/codegen/project-generator';
+import { downloadFile } from '@/lib/persistence/exporter';
+import type { GeneratedFile } from '@/lib/types/codegen';
 
 export function CodePreviewPanel() {
-  const language = useUIStore((s) => s.codePreviewLanguage);
-  const setLanguage = useUIStore((s) => s.setCodePreviewLanguage);
+  const preferredLanguage = useUIStore((s) => s.codePreviewLanguage);
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const project = useProjectStore((s) => s.currentProject);
-  const variables = project?.variables ?? [];
-  const projectName = project?.name ?? 'StateMachine';
+  const chartId = useNavigationStore((s) =>
+    s.activeView.type === 'chart' ? s.activeView.chartId : null
+  );
+  const variables = useProjectStore((s) => {
+    if (!chartId || !s.currentProject) return [];
+    const chart = s.currentProject.charts.find((c) => c.id === chartId);
+    return chart?.variables ?? [];
+  });
+  const chartName = useProjectStore((s) => {
+    if (!chartId || !s.currentProject) return s.currentProject?.name ?? 'StateMachine';
+    const chart = s.currentProject.charts.find((c) => c.id === chartId);
+    return chart?.name ?? 'StateMachine';
+  });
 
   const stateCount = nodes.filter((n) => n.type === 'stateNode').length;
 
-  const { cCode, sclCode, warnings, errors } = useMemo(() => {
+  const generated = useMemo(() => {
     if (stateCount === 0) {
-      return {
-        cCode: { header: '', source: '' },
-        sclCode: '',
-        warnings: [],
-        errors: [],
-      };
+      return { files: [] as GeneratedFile[], messages: [] };
     }
 
-    const model = buildModel(nodes, edges, variables, projectName);
-    const messages = validateModel(model);
-    const cResult = generateC(model);
-    const sclResult = generateSCL(model);
+    return generateProject({
+      nodes,
+      edges,
+      variables,
+      projectName: chartName,
+      target: 'both',
+    });
+  }, [nodes, edges, variables, chartName, stateCount]);
 
-    return {
-      cCode: cResult,
-      sclCode: sclResult,
-      warnings: messages.filter((m) => m.level === 'warning'),
-      errors: messages.filter((m) => m.level === 'error'),
-    };
-  }, [nodes, edges, variables, projectName, stateCount]);
+  const warnings = generated.messages.filter((m) => m.level === 'warning');
+  const errors = generated.messages.filter((m) => m.level === 'error');
+
+  const [selectedFileIdx, setSelectedFileIdx] = useState(0);
+
+  // When files change, select first file matching preferred language, or clamp index
+  useEffect(() => {
+    if (generated.files.length === 0) {
+      setSelectedFileIdx(0);
+      return;
+    }
+    const preferredIdx = generated.files.findIndex(
+      (f) => f.language === preferredLanguage
+    );
+    if (preferredIdx >= 0) {
+      setSelectedFileIdx(preferredIdx);
+    } else if (selectedFileIdx >= generated.files.length) {
+      setSelectedFileIdx(0);
+    }
+    // Only run when files change or preferred language changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generated.files.length, preferredLanguage]);
+
+  const selectedFile = generated.files[selectedFileIdx] ?? null;
 
   const handleCopy = () => {
-    const text = language === 'c'
-      ? `${cCode.header}\n\n${cCode.source}`
-      : sclCode;
-    navigator.clipboard.writeText(text);
+    if (selectedFile) {
+      navigator.clipboard.writeText(selectedFile.content);
+    }
+  };
+
+  const handleDownload = () => {
+    if (!selectedFile) return;
+    const mime = selectedFile.language === 'c' ? 'text/x-c' : 'text/plain';
+    downloadFile(selectedFile.content, selectedFile.filename, mime);
   };
 
   return (
     <div className="flex h-full flex-col">
-      <Tabs
-        value={language}
-        onValueChange={(v) => setLanguage(v as 'c' | 'scl')}
-        className="flex-1 flex flex-col min-h-0"
-      >
-        <div className="flex items-center justify-between border-b px-2 py-1">
-          <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-            <Code2 className="h-3 w-3" />
-            Code Preview
-            {(errors.length > 0 || warnings.length > 0) && (
-              <span className="flex items-center gap-0.5 ml-1">
-                {errors.length > 0 && (
-                  <span className="text-destructive text-[10px]">
-                    {errors.length} err
-                  </span>
-                )}
-                {warnings.length > 0 && (
-                  <span className="text-yellow-500 text-[10px] flex items-center gap-0.5">
-                    <AlertTriangle className="h-2.5 w-2.5" />
-                    {warnings.length}
-                  </span>
-                )}
-              </span>
-            )}
-          </span>
-          <div className="flex items-center gap-1">
-            {stateCount > 0 && (
+      <div className="flex items-center justify-between border-b px-2 py-1">
+        <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+          <Code2 className="h-3 w-3" />
+          Code Preview
+          {(errors.length > 0 || warnings.length > 0) && (
+            <span className="flex items-center gap-0.5 ml-1">
+              {errors.length > 0 && (
+                <span className="text-destructive text-[10px]">
+                  {errors.length} err
+                </span>
+              )}
+              {warnings.length > 0 && (
+                <span className="text-yellow-500 text-[10px] flex items-center gap-0.5">
+                  <AlertTriangle className="h-2.5 w-2.5" />
+                  {warnings.length}
+                </span>
+              )}
+            </span>
+          )}
+        </span>
+        <div className="flex items-center gap-1">
+          {stateCount > 0 && (
+            <>
               <Button
                 variant="ghost"
                 size="icon"
@@ -92,52 +118,57 @@ export function CodePreviewPanel() {
               >
                 <Copy className="h-3 w-3" />
               </Button>
-            )}
-            <TabsList className="h-7">
-              <TabsTrigger value="c" className="text-xs h-6 px-2">
-                C
-              </TabsTrigger>
-              <TabsTrigger value="scl" className="text-xs h-6 px-2">
-                SCL
-              </TabsTrigger>
-            </TabsList>
-          </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={handleDownload}
+                title="Download file"
+              >
+                <Download className="h-3 w-3" />
+              </Button>
+            </>
+          )}
         </div>
+      </div>
 
-        <TabsContent value="c" className="flex-1 m-0 min-h-0">
-          <ScrollArea className="h-full">
-            <pre className="p-3 text-xs font-mono leading-relaxed whitespace-pre">
-              {stateCount === 0 ? (
-                <span className="text-muted-foreground">
-                  {'/* Add states to see generated C code */'}
-                </span>
-              ) : (
-                <>
-                  <span className="text-muted-foreground/50 text-[10px]">{'/* === Header === */\n'}</span>
-                  <HighlightedC code={cCode.header} />
-                  <span>{'\n'}</span>
-                  <span className="text-muted-foreground/50 text-[10px]">{'/* === Source === */\n'}</span>
-                  <HighlightedC code={cCode.source} />
-                </>
-              )}
-            </pre>
-          </ScrollArea>
-        </TabsContent>
+      {/* File tabs */}
+      {generated.files.length > 0 && (
+        <div className="flex border-b overflow-x-auto">
+          {generated.files.map((file, idx) => (
+            <button
+              key={file.filename}
+              className={`px-3 py-1 text-xs font-mono border-b-2 whitespace-nowrap transition-colors ${
+                idx === selectedFileIdx
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+              onClick={() => setSelectedFileIdx(idx)}
+            >
+              {file.filename}
+            </button>
+          ))}
+        </div>
+      )}
 
-        <TabsContent value="scl" className="flex-1 m-0 min-h-0">
-          <ScrollArea className="h-full">
-            <pre className="p-3 text-xs font-mono leading-relaxed whitespace-pre">
-              {stateCount === 0 ? (
-                <span className="text-muted-foreground">
-                  {'(* Add states to see generated SCL code *)'}
-                </span>
+      {/* File content */}
+      <div className="flex-1 min-h-0">
+        <ScrollArea className="h-full">
+          <pre className="p-3 text-xs font-mono leading-relaxed whitespace-pre">
+            {selectedFile ? (
+              selectedFile.language === 'c' ? (
+                <HighlightedC code={selectedFile.content} />
               ) : (
-                <HighlightedSCL code={sclCode} />
-              )}
-            </pre>
-          </ScrollArea>
-        </TabsContent>
-      </Tabs>
+                <HighlightedSCL code={selectedFile.content} />
+              )
+            ) : (
+              <span className="text-muted-foreground">
+                {'/* Add states to see generated code */'}
+              </span>
+            )}
+          </pre>
+        </ScrollArea>
+      </div>
     </div>
   );
 }

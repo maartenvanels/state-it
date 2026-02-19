@@ -1,4 +1,5 @@
 import type { Project, AnnotationData } from '../types/project';
+import type { Chart } from '../types/chart';
 import type { StateBlock } from '../types/state';
 import type { Transition } from '../types/transition';
 import type {
@@ -7,19 +8,24 @@ import type {
   StateNode,
   DefaultTransitionNode,
   AnnotationNode,
+  ChartBlockNode,
 } from '../types/canvas';
+import type { SystemBlock } from '../types/system';
 import { DEFAULT_STATE_SIZE } from '../types/state';
 import { EMPTY_TRANSITION_LABEL } from '../types/transition';
 import { DEFAULT_ANNOTATION_SIZE } from '../utils/constants';
 
+// ─── Chart Serialization ────────────────────────────────────────
+
 /**
- * Serialize canvas state (nodes + edges) into a Project for storage
+ * Serialize canvas state (nodes + edges) back into a Chart's data
  */
-export function serializeCanvasToProject(
-  project: Project,
+export function serializeCanvasToChart(
+  chart: Chart,
   nodes: CanvasNode[],
-  edges: TransitionEdge[]
-): Project {
+  edges: TransitionEdge[],
+  viewport?: { x: number; y: number; zoom: number }
+): Chart {
   const states: StateBlock[] = [];
   const transitions: Transition[] = [];
   const annotations: AnnotationData[] = [];
@@ -64,25 +70,25 @@ export function serializeCanvasToProject(
   }
 
   return {
-    ...project,
+    ...chart,
     states,
     transitions,
     annotations,
-    updatedAt: new Date().toISOString(),
+    ...(viewport ? { viewport } : {}),
   };
 }
 
 /**
- * Deserialize a Project into canvas nodes and edges
+ * Deserialize a Chart into canvas nodes and edges
  */
-export function deserializeProjectToCanvas(project: Project): {
+export function deserializeChartToCanvas(chart: Chart): {
   nodes: CanvasNode[];
   edges: TransitionEdge[];
 } {
   const nodes: CanvasNode[] = [];
   const edges: TransitionEdge[] = [];
 
-  for (const state of project.states) {
+  for (const state of chart.states) {
     const stateNode: StateNode = {
       id: state.id,
       type: 'stateNode',
@@ -104,16 +110,13 @@ export function deserializeProjectToCanvas(project: Project): {
     nodes.push(stateNode);
   }
 
-  for (const transition of project.transitions) {
-    // Check if this is a default transition (source is a dot node)
+  for (const transition of chart.transitions) {
     if (transition.isDefault) {
-      // Check if the source dot node already exists in states
-      const sourceExists = project.states.some(
+      const sourceExists = chart.states.some(
         (s) => s.id === transition.sourceStateId
       );
       if (!sourceExists) {
-        // Recreate the default transition dot node
-        const targetState = project.states.find(
+        const targetState = chart.states.find(
           (s) => s.id === transition.targetStateId
         );
         if (targetState) {
@@ -155,9 +158,8 @@ export function deserializeProjectToCanvas(project: Project): {
     edges.push(edge);
   }
 
-  // Deserialize annotations
-  if (project.annotations) {
-    for (const anno of project.annotations) {
+  if (chart.annotations) {
+    for (const anno of chart.annotations) {
       const annotationNode: AnnotationNode = {
         id: anno.id,
         type: 'annotationNode',
@@ -178,4 +180,84 @@ export function deserializeProjectToCanvas(project: Project): {
   }
 
   return { nodes, edges };
+}
+
+// ─── System Serialization ───────────────────────────────────────
+
+/**
+ * Serialize the system canvas back into system blocks
+ * Updates positions/sizes from the canvas nodes
+ */
+export function serializeSystemCanvas(
+  currentBlocks: SystemBlock[],
+  nodes: CanvasNode[]
+): SystemBlock[] {
+  return currentBlocks.map((block) => {
+    const node = nodes.find((n) => n.id === block.id);
+    if (!node) return block;
+    return {
+      ...block,
+      position: node.position,
+      size: {
+        width: (node.style?.width as number) ?? block.size.width,
+        height: (node.style?.height as number) ?? block.size.height,
+      },
+    };
+  });
+}
+
+/**
+ * Deserialize system blocks into canvas nodes for the system view
+ */
+export function deserializeSystemToCanvas(project: Project): {
+  nodes: CanvasNode[];
+  edges: TransitionEdge[];
+} {
+  const nodes: CanvasNode[] = [];
+  const edges: TransitionEdge[] = [];
+
+  for (const block of project.systemBlocks) {
+    if (block.type === 'chart') {
+      const chart = project.charts.find((c) => c.id === block.chartId);
+      const chartNode: ChartBlockNode = {
+        id: block.id,
+        type: 'chartBlock',
+        position: block.position,
+        data: {
+          chartId: block.chartId ?? '',
+          chartName: chart?.name ?? block.name,
+          ports: chart?.ports ?? [],
+        },
+        style: {
+          width: block.size.width,
+          height: block.size.height,
+        },
+      };
+      nodes.push(chartNode);
+    }
+    // Phase C will add: constant, signalGenerator, scope, display, etc.
+  }
+
+  // Phase C will add: system wires as edges
+
+  return { nodes, edges };
+}
+
+// ─── Legacy Compat (wraps new functions) ────────────────────────
+
+/**
+ * @deprecated Use serializeCanvasToChart + serializeSystemCanvas instead.
+ * Kept for backward compatibility during transition.
+ */
+export function serializeCanvasToProject(
+  project: Project,
+  nodes: CanvasNode[],
+  edges: TransitionEdge[]
+): Project {
+  // This should not be called in the new architecture,
+  // but if it is, we return the project as-is with updated timestamp
+  return {
+    ...project,
+    updatedAt: new Date().toISOString(),
+  };
 }

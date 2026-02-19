@@ -6,6 +6,7 @@ import type { PanelImperativeHandle, PanelSize } from 'react-resizable-panels';
 import { GripVerticalIcon } from 'lucide-react';
 import { MenubarNav } from '@/components/layout/menubar-nav';
 import { Toolbar } from '@/components/layout/toolbar';
+import { BreadcrumbNav } from '@/components/layout/breadcrumb-nav';
 import { Sidebar } from '@/components/layout/sidebar';
 import { StatusBar } from '@/components/layout/status-bar';
 import { StateCanvas } from '@/components/canvas/state-canvas';
@@ -98,6 +99,7 @@ export default function EditorContent() {
     <>
       <MenubarNav />
       <Toolbar />
+      <BreadcrumbNav />
 
       <div className="flex-1 overflow-hidden">
         <Group
@@ -107,7 +109,7 @@ export default function EditorContent() {
           <Panel
             panelRef={leftRef}
             defaultSize={15}
-            minSize="180px"
+            minSize="270px"
             collapsible
             collapsedSize={0}
             onResize={onLeftResize}
@@ -117,19 +119,19 @@ export default function EditorContent() {
           </Panel>
           <Handle />
 
-          <Panel defaultSize={65} minSize="200px">
+          <Panel defaultSize={65} minSize="300px">
             <Group
               orientation="vertical"
               className="flex h-full w-full flex-col"
             >
-              <Panel defaultSize={75} minSize="100px">
+              <Panel defaultSize={75} minSize="150px">
                 <StateCanvas />
               </Panel>
               <Handle vertical />
               <Panel
                 panelRef={bottomRef}
                 defaultSize={25}
-                minSize="80px"
+                minSize="120px"
                 collapsible
                 collapsedSize={0}
                 onResize={onBottomResize}
@@ -144,7 +146,7 @@ export default function EditorContent() {
           <Panel
             panelRef={rightRef}
             defaultSize={20}
-            minSize="200px"
+            minSize="300px"
             collapsible
             collapsedSize={0}
             onResize={onRightResize}

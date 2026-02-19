@@ -14,6 +14,7 @@ import {
 import { useSimulationStore } from '@/lib/store/simulation-store';
 import { useCanvasStore } from '@/lib/store/canvas-store';
 import { useProjectStore } from '@/lib/store/project-store';
+import { useNavigationStore } from '@/lib/store/navigation-store';
 import { buildModel } from '@/lib/codegen/model-builder';
 import {
   evaluateStep,
@@ -37,16 +38,24 @@ export function SimulationToolbar() {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const project = useProjectStore((s) => s.currentProject);
+  const chartId = useNavigationStore((s) =>
+    s.activeView.type === 'chart' ? s.activeView.chartId : null
+  );
+  const variables = useProjectStore((s) => {
+    if (!chartId || !s.currentProject) return [];
+    const chart = s.currentProject.charts.find((c) => c.id === chartId);
+    return chart?.variables ?? [];
+  });
 
   const model = useMemo(() => {
     if (nodes.filter((n) => n.type === 'stateNode').length === 0) return null;
     return buildModel(
       nodes,
       edges,
-      project?.variables ?? [],
+      variables,
       project?.name ?? 'SM'
     );
-  }, [nodes, edges, project]);
+  }, [nodes, edges, variables, project]);
 
   const simCtxRef = useRef<SimulationContext | null>(null);
 

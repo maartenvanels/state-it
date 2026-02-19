@@ -4,15 +4,13 @@ import { useEffect, useRef } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useProjectStore } from '@/lib/store/project-store';
 import { useCanvasStore } from '@/lib/store/canvas-store';
+import { useNavigationStore } from '@/lib/store/navigation-store';
 import {
   getLastProjectId,
   loadProject,
   saveProject,
 } from '@/lib/persistence/storage';
-import {
-  deserializeProjectToCanvas,
-  serializeCanvasToProject,
-} from '@/lib/persistence/serializer';
+import { deserializeSystemToCanvas } from '@/lib/persistence/serializer';
 
 export default function EditorLayout({
   children,
@@ -30,10 +28,15 @@ export default function EditorLayout({
     if (lastId) {
       const project = loadProject(lastId);
       if (project) {
-        const { nodes, edges } = deserializeProjectToCanvas(project);
+        useProjectStore.getState().setCurrentProject(project);
+
+        // Default to system view
+        const { nodes, edges } = deserializeSystemToCanvas(project);
         useCanvasStore.getState().setNodes(nodes);
         useCanvasStore.getState().setEdges(edges);
-        useProjectStore.getState().setCurrentProject(project);
+        if (project.systemViewport) {
+          useCanvasStore.getState().setViewport(project.systemViewport);
+        }
         return;
       }
     }
@@ -47,9 +50,29 @@ export default function EditorLayout({
       const { currentProject, isDirty, markClean } =
         useProjectStore.getState();
       if (!isDirty || !currentProject) return;
-      const { nodes, edges } = useCanvasStore.getState();
-      const saved = serializeCanvasToProject(currentProject, nodes, edges);
-      saveProject(saved);
+
+      // Flush active canvas back to project before saving
+      const activeView = useNavigationStore.getState().activeView;
+      const canvasState = useCanvasStore.getState();
+      if (activeView.type === 'chart') {
+        useProjectStore.getState().flushCanvasToChart(
+          activeView.chartId,
+          canvasState.nodes,
+          canvasState.edges,
+          canvasState.viewport
+        );
+      } else {
+        useProjectStore.getState().flushCanvasToSystem(
+          canvasState.nodes,
+          canvasState.viewport
+        );
+      }
+
+      // Save the flushed project
+      const flushedProject = useProjectStore.getState().currentProject;
+      if (flushedProject) {
+        saveProject(flushedProject);
+      }
       markClean();
     }, 30000);
     return () => clearInterval(timer);

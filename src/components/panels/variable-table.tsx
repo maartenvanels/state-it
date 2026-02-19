@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useProjectStore } from '@/lib/store/project-store';
+import { useNavigationStore } from '@/lib/store/navigation-store';
 import type { Variable, VariableScope, DataType } from '@/lib/types/variable';
 import { Plus, Trash2, ChevronRight, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -38,10 +39,39 @@ const SCOPE_COLORS: Record<VariableScope, string> = {
 const NAME_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
 export function VariableTable() {
-  const variables = useProjectStore((s) => s.currentProject?.variables ?? []);
-  const addVariable = useProjectStore((s) => s.addVariable);
-  const updateVariable = useProjectStore((s) => s.updateVariable);
-  const removeVariable = useProjectStore((s) => s.removeVariable);
+  const chartId = useNavigationStore((s) =>
+    s.activeView.type === 'chart' ? s.activeView.chartId : null
+  );
+  const variables = useProjectStore((s) => {
+    if (!chartId || !s.currentProject) return [];
+    const chart = s.currentProject.charts.find((c) => c.id === chartId);
+    return chart?.variables ?? [];
+  });
+  const addVariableStore = useProjectStore((s) => s.addVariable);
+  const updateVariableStore = useProjectStore((s) => s.updateVariable);
+  const removeVariableStore = useProjectStore((s) => s.removeVariable);
+
+  const addVariable = useCallback(
+    (variable: Omit<Variable, 'id'>) => {
+      if (!chartId) return '';
+      return addVariableStore(chartId, variable);
+    },
+    [chartId, addVariableStore]
+  );
+  const updateVariable = useCallback(
+    (varId: string, updates: Partial<Variable>) => {
+      if (!chartId) return;
+      updateVariableStore(chartId, varId, updates);
+    },
+    [chartId, updateVariableStore]
+  );
+  const removeVariable = useCallback(
+    (varId: string) => {
+      if (!chartId) return;
+      removeVariableStore(chartId, varId);
+    },
+    [chartId, removeVariableStore]
+  );
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [newRowId, setNewRowId] = useState<string | null>(null);

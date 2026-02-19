@@ -1,6 +1,5 @@
-import type { StateBlock } from './state';
-import type { Transition } from './transition';
-import type { Variable } from './variable';
+import type { Chart } from './chart';
+import type { SystemBlock, SystemWire } from './system';
 
 export interface AnnotationData {
   id: string;
@@ -20,10 +19,10 @@ export interface Project {
   createdAt: string;
   updatedAt: string;
   settings: ProjectSettings;
-  states: StateBlock[];
-  transitions: Transition[];
-  variables: Variable[];
-  annotations?: AnnotationData[];
+  charts: Chart[];
+  systemBlocks: SystemBlock[];
+  systemWires: SystemWire[];
+  systemViewport?: { x: number; y: number; zoom: number };
 }
 
 export interface ProjectSettings {
@@ -39,8 +38,7 @@ export interface ProjectMeta {
   id: string;
   name: string;
   updatedAt: string;
-  stateCount: number;
-  transitionCount: number;
+  chartCount: number;
 }
 
 export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {

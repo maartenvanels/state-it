@@ -5,6 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useUIStore } from '@/lib/store/ui-store';
 import { useCanvasStore } from '@/lib/store/canvas-store';
+import { useProjectStore } from '@/lib/store/project-store';
+import { useNavigationStore } from '@/lib/store/navigation-store';
 import {
   GitBranchPlus,
   Database,
@@ -12,6 +14,7 @@ import {
   ChevronDown,
   BookOpen,
   StickyNote,
+  LayoutGrid,
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import type { CanvasNode } from '@/lib/types/canvas';
@@ -22,6 +25,8 @@ export function Sidebar() {
   const leftPanelTab = useUIStore((s) => s.leftPanelTab);
   const setLeftPanelTab = useUIStore((s) => s.setLeftPanelTab);
   const nodes = useCanvasStore((s) => s.nodes);
+  const activeView = useNavigationStore((s) => s.activeView);
+  const isSystemView = activeView.type === 'system';
 
   const selectedNodeIds = useUIStore((s) => s.selectedNodeIds);
   const setSelection = useUIStore((s) => s.setSelection);
@@ -40,8 +45,11 @@ export function Sidebar() {
       >
         <TabsList className="mx-2 mt-2 grid w-auto grid-cols-3">
           <TabsTrigger value="hierarchy" className="text-xs">
-            <GitBranchPlus className="mr-1 h-3 w-3" />
-            States
+            {isSystemView ? (
+              <><LayoutGrid className="mr-1 h-3 w-3" />Charts</>
+            ) : (
+              <><GitBranchPlus className="mr-1 h-3 w-3" />States</>
+            )}
           </TabsTrigger>
           <TabsTrigger value="data" className="text-xs">
             <Database className="mr-1 h-3 w-3" />
@@ -55,50 +63,56 @@ export function Sidebar() {
 
         <TabsContent value="hierarchy" className="flex-1 m-0">
           <ScrollArea className="h-full p-2">
-            {stateNodes.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center text-sm text-muted-foreground">
-                <GitBranchPlus className="mb-2 h-8 w-8 opacity-50" />
-                <p>No states yet</p>
-                <p className="text-xs mt-1">
-                  Click + or press S to add a state
-                </p>
-              </div>
+            {isSystemView ? (
+              <ChartListPanel />
             ) : (
-              <div className="space-y-0.5">
-                {rootNodes.map((node) => (
-                  <StateTreeItem key={node.id} node={node} depth={0} />
-                ))}
-              </div>
-            )}
-            {annotationNodes.length > 0 && (
               <>
-                <Separator className="my-2" />
-                <div className="px-1 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Annotations ({annotationNodes.length})
-                </div>
-                <div className="space-y-0.5">
-                  {annotationNodes.map((node) => (
-                    <button
-                      key={node.id}
-                      className={`flex w-full items-center rounded px-2 py-1 text-left text-xs transition-colors hover:bg-accent ${
-                        selectedNodeIds.includes(node.id)
-                          ? 'bg-accent text-accent-foreground font-medium'
-                          : ''
-                      }`}
-                      onClick={() => setSelection([node.id], [])}
-                    >
-                      <StickyNote
-                        className="mr-1.5 h-3 w-3 flex-shrink-0"
-                        style={{ color: node.type === 'annotationNode' ? (node.data.color ?? '#fef08a') : undefined }}
-                      />
-                      <span className="truncate">
-                        {node.type === 'annotationNode'
-                          ? (node.data.content?.split('\n')[0]?.slice(0, 30) || 'Empty note')
-                          : ''}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                {stateNodes.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center text-sm text-muted-foreground">
+                    <GitBranchPlus className="mb-2 h-8 w-8 opacity-50" />
+                    <p>No states yet</p>
+                    <p className="text-xs mt-1">
+                      Click + or press S to add a state
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-0.5">
+                    {rootNodes.map((node) => (
+                      <StateTreeItem key={node.id} node={node} depth={0} />
+                    ))}
+                  </div>
+                )}
+                {annotationNodes.length > 0 && (
+                  <>
+                    <Separator className="my-2" />
+                    <div className="px-1 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                      Annotations ({annotationNodes.length})
+                    </div>
+                    <div className="space-y-0.5">
+                      {annotationNodes.map((node) => (
+                        <button
+                          key={node.id}
+                          className={`flex w-full items-center rounded px-2 py-1 text-left text-xs transition-colors hover:bg-accent ${
+                            selectedNodeIds.includes(node.id)
+                              ? 'bg-accent text-accent-foreground font-medium'
+                              : ''
+                          }`}
+                          onClick={() => setSelection([node.id], [])}
+                        >
+                          <StickyNote
+                            className="mr-1.5 h-3 w-3 flex-shrink-0"
+                            style={{ color: node.type === 'annotationNode' ? (node.data.color ?? '#fef08a') : undefined }}
+                          />
+                          <span className="truncate">
+                            {node.type === 'annotationNode'
+                              ? (node.data.content?.split('\n')[0]?.slice(0, 30) || 'Empty note')
+                              : ''}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </>
             )}
           </ScrollArea>
@@ -197,6 +211,39 @@ function StateTreeItem({ node, depth }: { node: CanvasNode; depth: number }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function ChartListPanel() {
+  const charts = useProjectStore((s) => s.currentProject?.charts ?? []);
+  const navigateToChart = useNavigationStore((s) => s.navigateToChart);
+
+  if (charts.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-center text-sm text-muted-foreground">
+        <LayoutGrid className="mb-2 h-8 w-8 opacity-50" />
+        <p>No charts yet</p>
+        <p className="text-xs mt-1">Click + to add a chart</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-0.5">
+      {charts.map((chart) => (
+        <button
+          key={chart.id}
+          className="flex w-full items-center rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent"
+          onDoubleClick={() => navigateToChart(chart.id)}
+        >
+          <LayoutGrid className="mr-1.5 h-3 w-3 flex-shrink-0 text-primary" />
+          <span className="truncate font-medium">{chart.name}</span>
+          <span className="ml-auto text-[9px] text-muted-foreground">
+            {chart.states.length} states
+          </span>
+        </button>
+      ))}
     </div>
   );
 }

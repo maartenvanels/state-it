@@ -19,6 +19,8 @@ import {
 } from '@/components/ui/tooltip';
 import { useUIStore } from '@/lib/store/ui-store';
 import { useCanvasStore } from '@/lib/store/canvas-store';
+import { useProjectStore } from '@/lib/store/project-store';
+import { useNavigationStore } from '@/lib/store/navigation-store';
 
 export function Toolbar() {
   const interactionMode = useUIStore((s) => s.interactionMode);
@@ -26,6 +28,9 @@ export function Toolbar() {
   const selectedNodeIds = useUIStore((s) => s.selectedNodeIds);
   const nodes = useCanvasStore((s) => s.nodes);
   const addDefaultTransitionNode = useCanvasStore((s) => s.addDefaultTransitionNode);
+  const activeView = useNavigationStore((s) => s.activeView);
+  const isSystemView = activeView.type === 'system';
+  const addChart = useProjectStore((s) => s.addChart);
 
   const selectedStateNode = selectedNodeIds.length === 1
     ? nodes.find((n) => n.id === selectedNodeIds[0] && n.type === 'stateNode')
@@ -60,34 +65,58 @@ export function Toolbar() {
         <TooltipContent>Select (V)</TooltipContent>
       </Tooltip>
 
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant={interactionMode === 'addState' ? 'secondary' : 'ghost'}
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setInteractionMode('addState')}
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Add State (S)</TooltipContent>
-      </Tooltip>
+      {isSystemView ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => {
+                const chartId = addChart(`Chart_${Date.now() % 1000}`);
+                if (chartId) {
+                  // Reload system canvas with the new chart block
+                  useNavigationStore.getState().navigateToSystem();
+                }
+              }}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Add Chart</TooltipContent>
+        </Tooltip>
+      ) : (
+        <>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={interactionMode === 'addState' ? 'secondary' : 'ghost'}
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setInteractionMode('addState')}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Add State (S)</TooltipContent>
+          </Tooltip>
 
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            disabled={!selectedStateNode}
-            onClick={handleAddDefaultTransition}
-          >
-            <CircleDot className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Add Default Transition</TooltipContent>
-      </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                disabled={!selectedStateNode}
+                onClick={handleAddDefaultTransition}
+              >
+                <CircleDot className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Add Default Transition</TooltipContent>
+          </Tooltip>
+        </>
+      )}
 
       <Separator orientation="vertical" className="mx-1 h-6" />
 

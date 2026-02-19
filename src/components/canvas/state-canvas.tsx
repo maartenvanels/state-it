@@ -19,10 +19,12 @@ import '@xyflow/react/dist/style.css';
 import { useCanvasStore } from '@/lib/store/canvas-store';
 import { useUIStore } from '@/lib/store/ui-store';
 import { useProjectStore } from '@/lib/store/project-store';
+import { useNavigationStore } from '@/lib/store/navigation-store';
 import { StateNode } from './state-node';
 import { TransitionEdge } from './transition-edge';
 import { DefaultTransitionNode } from './default-transition-node';
 import { AnnotationNode } from './annotation-node';
+import { ChartBlockNode } from './chart-block-node';
 import { CanvasContextMenu } from './canvas-context-menu';
 import type { TransitionEdge as TransitionEdgeType, CanvasNode } from '@/lib/types/canvas';
 import { snapToGrid, isDescendantOf, getNodeSize } from '@/lib/utils/geometry';
@@ -33,6 +35,7 @@ const nodeTypes: Record<string, any> = {
   stateNode: StateNode,
   defaultTransition: DefaultTransitionNode,
   annotationNode: AnnotationNode,
+  chartBlock: ChartBlockNode,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,6 +70,9 @@ export function StateCanvas() {
   const clearDragHighlights = useUIStore((s) => s.clearDragHighlights);
   const setIsConnecting = useUIStore((s) => s.setIsConnecting);
 
+  const activeView = useNavigationStore((s) => s.activeView);
+  const isSystemView = activeView.type === 'system';
+
   const settings = useProjectStore((s) => s.currentProject?.settings);
   const gridSize = settings?.gridSize ?? 20;
   const showGrid = settings?.showGrid ?? true;
@@ -77,7 +83,7 @@ export function StateCanvas() {
 
   const handlePaneClick = useCallback(
     (event: React.MouseEvent) => {
-      if (interactionMode === 'addState') {
+      if (!isSystemView && interactionMode === 'addState') {
         const position = screenToFlowPosition({
           x: event.clientX,
           y: event.clientY,
@@ -94,6 +100,7 @@ export function StateCanvas() {
     },
     [
       interactionMode,
+      isSystemView,
       screenToFlowPosition,
       snapEnabled,
       gridSize,
@@ -229,10 +236,15 @@ export function StateCanvas() {
       if (source === target) return false;
       const targetNode = nodes.find((n) => n.id === target);
       if (!targetNode) return false;
+      // In chart view, only connect to stateNodes
+      // In system view, allow chartBlock connections (Phase C wiring)
+      if (isSystemView) {
+        return targetNode.type === 'chartBlock';
+      }
       if (targetNode.type !== 'stateNode') return false;
       return true;
     },
-    [nodes]
+    [nodes, isSystemView]
   );
 
   // Keyboard shortcuts
@@ -356,7 +368,7 @@ export function StateCanvas() {
     <CanvasContextMenu>
       <div ref={reactFlowWrapper} className={`h-full w-full ${cursorClass} relative`}>
         {svgDefs}
-        <SimulationToolbar />
+        {!isSystemView && <SimulationToolbar />}
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -414,6 +426,9 @@ export function StateCanvas() {
               }
               if (node.type === 'annotationNode') {
                 return data?.color ?? '#fef08a';
+              }
+              if (node.type === 'chartBlock') {
+                return 'var(--primary)';
               }
               return 'var(--muted)';
             }}

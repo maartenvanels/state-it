@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useProjectStore } from '@/lib/store/project-store';
 import { useCanvasStore } from '@/lib/store/canvas-store';
+import { useNavigationStore } from '@/lib/store/navigation-store';
 import {
   exportProjectJSON,
   exportCCode,
@@ -25,23 +26,47 @@ export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
   const project = useProjectStore((s) => s.currentProject);
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
+  const chartId = useNavigationStore((s) =>
+    s.activeView.type === 'chart' ? s.activeView.chartId : null
+  );
+  const variables = useProjectStore((s) => {
+    if (!chartId || !s.currentProject) return [];
+    const chart = s.currentProject.charts.find((c) => c.id === chartId);
+    return chart?.variables ?? [];
+  });
+  const chartName = useProjectStore((s) => {
+    if (!chartId || !s.currentProject) return s.currentProject?.name ?? 'StateMachine';
+    const chart = s.currentProject.charts.find((c) => c.id === chartId);
+    return chart?.name ?? 'StateMachine';
+  });
 
   if (!project) return null;
 
   const stateCount = nodes.filter((n) => n.type === 'stateNode').length;
 
   const handleExportJSON = () => {
-    exportProjectJSON(project, nodes, edges);
+    // Flush current view before exporting
+    const canvasState = useCanvasStore.getState();
+    const activeView = useNavigationStore.getState().activeView;
+    if (activeView.type === 'chart') {
+      useProjectStore.getState().flushCanvasToChart(
+        activeView.chartId, canvasState.nodes, canvasState.edges, canvasState.viewport
+      );
+    } else {
+      useProjectStore.getState().flushCanvasToSystem(canvasState.nodes, canvasState.viewport);
+    }
+    const flushedProject = useProjectStore.getState().currentProject;
+    if (flushedProject) exportProjectJSON(flushedProject);
     onOpenChange(false);
   };
 
   const handleExportC = () => {
-    exportCCode(project, nodes, edges);
+    exportCCode(chartName, variables, nodes, edges);
     onOpenChange(false);
   };
 
   const handleExportSCL = () => {
-    exportSCLCode(project, nodes, edges);
+    exportSCLCode(chartName, variables, nodes, edges);
     onOpenChange(false);
   };
 

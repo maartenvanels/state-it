@@ -12,16 +12,14 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useProjectStore } from '@/lib/store/project-store';
 import { useCanvasStore } from '@/lib/store/canvas-store';
+import { useNavigationStore } from '@/lib/store/navigation-store';
 import {
   getProjectMetaList,
   loadProject,
   deleteProject,
   saveProject,
 } from '@/lib/persistence/storage';
-import {
-  serializeCanvasToProject,
-  deserializeProjectToCanvas,
-} from '@/lib/persistence/serializer';
+import { deserializeSystemToCanvas } from '@/lib/persistence/serializer';
 import { importProjectJSON } from '@/lib/persistence/exporter';
 import { Trash2, Upload, FileJson } from 'lucide-react';
 import type { ProjectMeta } from '@/lib/types/project';
@@ -49,24 +47,36 @@ export function OpenProjectDialog({
     }
   }, [open]);
 
+  const flushAndSaveCurrent = () => {
+    if (!currentProject) return;
+    const canvasState = useCanvasStore.getState();
+    const activeView = useNavigationStore.getState().activeView;
+    if (activeView.type === 'chart') {
+      useProjectStore.getState().flushCanvasToChart(
+        activeView.chartId, canvasState.nodes, canvasState.edges, canvasState.viewport
+      );
+    } else {
+      useProjectStore.getState().flushCanvasToSystem(canvasState.nodes, canvasState.viewport);
+    }
+    const flushed = useProjectStore.getState().currentProject;
+    if (flushed) saveProject(flushed);
+  };
+
   const handleOpen = () => {
     if (!selectedId) return;
     const project = loadProject(selectedId);
     if (!project) return;
 
     // Save current project
-    if (currentProject) {
-      const nodes = useCanvasStore.getState().nodes;
-      const edges = useCanvasStore.getState().edges;
-      const saved = serializeCanvasToProject(currentProject, nodes, edges);
-      saveProject(saved);
-    }
+    flushAndSaveCurrent();
 
-    // Load the selected project
-    const { nodes, edges } = deserializeProjectToCanvas(project);
+    // Load the selected project at system view
+    const { nodes, edges } = deserializeSystemToCanvas(project);
     useCanvasStore.getState().setNodes(nodes);
     useCanvasStore.getState().setEdges(edges);
     setCurrentProject(project);
+    useNavigationStore.setState({ activeView: { type: 'system' } });
+    useCanvasStore.temporal.getState().clear();
 
     onOpenChange(false);
   };
@@ -84,19 +94,16 @@ export function OpenProjectDialog({
       const project = await importProjectJSON(file);
 
       // Save current project
-      if (currentProject) {
-        const nodes = useCanvasStore.getState().nodes;
-        const edges = useCanvasStore.getState().edges;
-        const saved = serializeCanvasToProject(currentProject, nodes, edges);
-        saveProject(saved);
-      }
+      flushAndSaveCurrent();
 
-      // Load imported project
+      // Load imported project at system view
       saveProject(project);
-      const { nodes, edges } = deserializeProjectToCanvas(project);
+      const { nodes, edges } = deserializeSystemToCanvas(project);
       useCanvasStore.getState().setNodes(nodes);
       useCanvasStore.getState().setEdges(edges);
       setCurrentProject(project);
+      useNavigationStore.setState({ activeView: { type: 'system' } });
+      useCanvasStore.temporal.getState().clear();
 
       onOpenChange(false);
     } catch {
@@ -138,7 +145,7 @@ export function OpenProjectDialog({
                   <div>
                     <div className="font-medium">{p.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {p.stateCount} states, {p.transitionCount} transitions
+                      {p.chartCount} chart{p.chartCount !== 1 ? 's' : ''}
                       <span className="mx-1">&middot;</span>
                       {new Date(p.updatedAt).toLocaleDateString()}
                     </div>

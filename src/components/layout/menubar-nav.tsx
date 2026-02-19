@@ -13,9 +13,9 @@ import {
 import { useUIStore } from '@/lib/store/ui-store';
 import { useProjectStore } from '@/lib/store/project-store';
 import { useCanvasStore } from '@/lib/store/canvas-store';
+import { useNavigationStore } from '@/lib/store/navigation-store';
 import { ThemeToggle } from '@/components/shared/theme-toggle';
 import { saveProject } from '@/lib/persistence/storage';
-import { serializeCanvasToProject } from '@/lib/persistence/serializer';
 import { NewProjectDialog } from '@/components/dialogs/new-project-dialog';
 import { OpenProjectDialog } from '@/components/dialogs/open-project-dialog';
 import { ExportDialog } from '@/components/dialogs/export-dialog';
@@ -33,10 +33,20 @@ export function MenubarNav() {
   const handleSave = useCallback(() => {
     const project = useProjectStore.getState().currentProject;
     if (!project) return;
-    const nodes = useCanvasStore.getState().nodes;
-    const edges = useCanvasStore.getState().edges;
-    const saved = serializeCanvasToProject(project, nodes, edges);
-    saveProject(saved);
+
+    // Flush active canvas back to project
+    const canvasState = useCanvasStore.getState();
+    const activeView = useNavigationStore.getState().activeView;
+    if (activeView.type === 'chart') {
+      useProjectStore.getState().flushCanvasToChart(
+        activeView.chartId, canvasState.nodes, canvasState.edges, canvasState.viewport
+      );
+    } else {
+      useProjectStore.getState().flushCanvasToSystem(canvasState.nodes, canvasState.viewport);
+    }
+
+    const flushedProject = useProjectStore.getState().currentProject;
+    if (flushedProject) saveProject(flushedProject);
     useProjectStore.getState().markClean();
   }, []);
 

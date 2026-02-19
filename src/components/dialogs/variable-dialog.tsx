@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useProjectStore } from '@/lib/store/project-store';
+import { useNavigationStore } from '@/lib/store/navigation-store';
 import type { Variable, VariableScope, DataType } from '@/lib/types/variable';
 
 interface VariableDialogProps {
@@ -53,8 +54,11 @@ export function VariableDialog({
   onOpenChange,
   editVariable,
 }: VariableDialogProps) {
-  const addVariable = useProjectStore((s) => s.addVariable);
-  const updateVariable = useProjectStore((s) => s.updateVariable);
+  const chartId = useNavigationStore((s) =>
+    s.activeView.type === 'chart' ? s.activeView.chartId : null
+  );
+  const addVariableStore = useProjectStore((s) => s.addVariable);
+  const updateVariableStore = useProjectStore((s) => s.updateVariable);
 
   const [name, setName] = useState('');
   const [scope, setScope] = useState<VariableScope>('local');
@@ -110,10 +114,11 @@ export function VariableDialog({
         : {}),
     };
 
+    if (!chartId) return;
     if (editVariable) {
-      updateVariable(editVariable.id, variable);
+      updateVariableStore(chartId, editVariable.id, variable);
     } else {
-      addVariable(variable);
+      addVariableStore(chartId, variable);
     }
 
     onOpenChange(false);

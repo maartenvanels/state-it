@@ -13,8 +13,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useProjectStore } from '@/lib/store/project-store';
 import { useCanvasStore } from '@/lib/store/canvas-store';
+import { useNavigationStore } from '@/lib/store/navigation-store';
 import { saveProject } from '@/lib/persistence/storage';
-import { serializeCanvasToProject } from '@/lib/persistence/serializer';
+import { deserializeSystemToCanvas } from '@/lib/persistence/serializer';
 
 interface NewProjectDialogProps {
   open: boolean;
@@ -31,20 +32,33 @@ export function NewProjectDialog({ open, onOpenChange }: NewProjectDialogProps) 
   const handleCreate = () => {
     const projectName = name.trim() || 'Untitled Project';
 
-    // Save current project before switching
+    // Flush and save current project before switching
     if (currentProject) {
-      const nodes = useCanvasStore.getState().nodes;
-      const edges = useCanvasStore.getState().edges;
-      const saved = serializeCanvasToProject(currentProject, nodes, edges);
-      saveProject(saved);
+      const canvasState = useCanvasStore.getState();
+      const activeView = useNavigationStore.getState().activeView;
+      if (activeView.type === 'chart') {
+        useProjectStore.getState().flushCanvasToChart(
+          activeView.chartId, canvasState.nodes, canvasState.edges, canvasState.viewport
+        );
+      } else {
+        useProjectStore.getState().flushCanvasToSystem(canvasState.nodes, canvasState.viewport);
+      }
+      const flushed = useProjectStore.getState().currentProject;
+      if (flushed) saveProject(flushed);
     }
 
     // Reset canvas
     useCanvasStore.getState().reset();
 
-    // Create new project
+    // Create new project and load system view
     const project = createProject(projectName, description.trim());
     saveProject(project);
+
+    const { nodes, edges } = deserializeSystemToCanvas(project);
+    useCanvasStore.getState().setNodes(nodes);
+    useCanvasStore.getState().setEdges(edges);
+    useNavigationStore.setState({ activeView: { type: 'system' } });
+    useCanvasStore.temporal.getState().clear();
 
     setName('');
     setDescription('');

@@ -1,14 +1,12 @@
 import type { Project } from '../types/project';
+import type { Variable } from '../types/variable';
 import type { CanvasNode, TransitionEdge } from '../types/canvas';
-import { serializeCanvasToProject } from './serializer';
-import { buildModel } from '../codegen/model-builder';
-import { generateC } from '../codegen/c-generator';
-import { generateSCL } from '../codegen/scl-generator';
+import { generateProject } from '../codegen/project-generator';
 
 /**
  * Download a string as a file
  */
-function downloadFile(content: string, filename: string, mimeType: string) {
+export function downloadFile(content: string, filename: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -21,47 +19,75 @@ function downloadFile(content: string, filename: string, mimeType: string) {
 }
 
 /**
- * Export project as JSON
+ * Export project as JSON (full project — should be flushed before calling)
  */
-export function exportProjectJSON(
-  project: Project,
-  nodes: CanvasNode[],
-  edges: TransitionEdge[]
-) {
-  const fullProject = serializeCanvasToProject(project, nodes, edges);
-  const json = JSON.stringify(fullProject, null, 2);
+export function exportProjectJSON(project: Project) {
+  const json = JSON.stringify(project, null, 2);
   downloadFile(json, `${project.name}.states.json`, 'application/json');
 }
 
 /**
- * Export generated C code
+ * Export generated C code for a single chart
  */
 export function exportCCode(
-  project: Project,
+  chartName: string,
+  variables: Variable[],
   nodes: CanvasNode[],
   edges: TransitionEdge[]
 ) {
-  const model = buildModel(nodes, edges, project.variables, project.name);
-  const { header, source } = generateC(model);
-  const safeName = model.name.toLowerCase();
-
-  downloadFile(header, `${safeName}.h`, 'text/x-c');
-  downloadFile(source, `${safeName}.c`, 'text/x-c');
+  const generated = generateProject({
+    nodes,
+    edges,
+    variables,
+    projectName: chartName,
+    target: 'c',
+  });
+  for (const file of generated.files) {
+    downloadFile(file.content, file.filename, 'text/x-c');
+  }
 }
 
 /**
- * Export generated SCL code
+ * Export generated SCL code for a single chart
  */
 export function exportSCLCode(
-  project: Project,
+  chartName: string,
+  variables: Variable[],
   nodes: CanvasNode[],
   edges: TransitionEdge[]
 ) {
-  const model = buildModel(nodes, edges, project.variables, project.name);
-  const scl = generateSCL(model);
-  const safeName = model.name.toLowerCase();
+  const generated = generateProject({
+    nodes,
+    edges,
+    variables,
+    projectName: chartName,
+    target: 'scl',
+  });
+  for (const file of generated.files) {
+    downloadFile(file.content, file.filename, 'text/plain');
+  }
+}
 
-  downloadFile(scl, `${safeName}.scl`, 'text/plain');
+/**
+ * Export all generated code files (C + SCL) for a single chart
+ */
+export function exportAllCode(
+  chartName: string,
+  variables: Variable[],
+  nodes: CanvasNode[],
+  edges: TransitionEdge[]
+) {
+  const generated = generateProject({
+    nodes,
+    edges,
+    variables,
+    projectName: chartName,
+    target: 'both',
+  });
+  for (const file of generated.files) {
+    const mime = file.language === 'c' ? 'text/x-c' : 'text/plain';
+    downloadFile(file.content, file.filename, mime);
+  }
 }
 
 /**
