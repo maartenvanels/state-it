@@ -31,13 +31,22 @@ import {
   Group,
   AlignLeft,
   GalleryVerticalEnd,
+  LayoutGrid,
+  Hash,
+  Activity,
+  LineChart,
+  Monitor,
 } from 'lucide-react';
 import { useCanvasStore } from '@/lib/store/canvas-store';
 import { useUIStore } from '@/lib/store/ui-store';
+import { useProjectStore } from '@/lib/store/project-store';
+import { useNavigationStore } from '@/lib/store/navigation-store';
 import { useReactFlow } from '@xyflow/react';
 import { snapToGrid } from '@/lib/utils/geometry';
 import { useCallback, useRef } from 'react';
 import type { AlignDirection, DistributeAxis, MatchDimension } from '@/lib/utils/geometry';
+import { deserializeSystemToCanvas } from '@/lib/persistence/serializer';
+import type { SystemBlockType } from '@/lib/types/system';
 
 export function CanvasContextMenu({
   children,
@@ -57,6 +66,9 @@ export function CanvasContextMenu({
   const selectedEdgeIds = useUIStore((s) => s.selectedEdgeIds);
   const setSelection = useUIStore((s) => s.setSelection);
 
+  const activeView = useNavigationStore((s) => s.activeView);
+  const isSystemView = activeView.type === 'system';
+
   const { screenToFlowPosition, fitView } = useReactFlow();
   const contextPosition = useRef({ x: 0, y: 0 });
 
@@ -71,6 +83,8 @@ export function CanvasContextMenu({
     []
   );
 
+  // ─── Chart view handlers ─────────────────────────────────
+
   const handleAddState = useCallback(() => {
     const position = screenToFlowPosition(contextPosition.current);
     const snapped = snapToGrid(position);
@@ -84,6 +98,37 @@ export function CanvasContextMenu({
     const newId = addAnnotationNode(snapped);
     setSelection([newId], []);
   }, [screenToFlowPosition, addAnnotationNode, setSelection]);
+
+  // ─── System view handlers ────────────────────────────────
+
+  const reloadSystemCanvas = useCallback(() => {
+    const project = useProjectStore.getState().currentProject;
+    if (!project) return;
+    const { nodes: newNodes, edges: newEdges } = deserializeSystemToCanvas(project);
+    useCanvasStore.getState().setNodes(newNodes);
+    useCanvasStore.getState().setEdges(newEdges);
+  }, []);
+
+  const handleAddChart = useCallback(() => {
+    const addChart = useProjectStore.getState().addChart;
+    addChart(`Chart_${Date.now() % 1000}`);
+    reloadSystemCanvas();
+  }, [reloadSystemCanvas]);
+
+  const handleAddSystemBlock = useCallback(
+    (type: SystemBlockType, baseName: string) => {
+      const store = useProjectStore.getState();
+      const blockCount = store.currentProject?.systemBlocks.filter(
+        (b) => b.type === type
+      ).length ?? 0;
+      const position = screenToFlowPosition(contextPosition.current);
+      store.addSystemBlock(type, `${baseName}_${blockCount + 1}`, position);
+      reloadSystemCanvas();
+    },
+    [screenToFlowPosition, reloadSystemCanvas]
+  );
+
+  // ─── Shared handlers ─────────────────────────────────────
 
   const handleSelectAll = useCallback(() => {
     setSelection(
@@ -137,15 +182,45 @@ export function CanvasContextMenu({
         {children}
       </ContextMenuTrigger>
       <ContextMenuContent className="w-52">
-        {/* -- Always visible -- */}
-        <ContextMenuItem onClick={handleAddState}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add State
-        </ContextMenuItem>
-        <ContextMenuItem onClick={handleAddAnnotation}>
-          <StickyNote className="mr-2 h-4 w-4" />
-          Add Annotation
-        </ContextMenuItem>
+        {isSystemView ? (
+          <>
+            {/* System view items */}
+            <ContextMenuItem onClick={handleAddChart}>
+              <LayoutGrid className="mr-2 h-4 w-4" />
+              Add Chart
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={() => handleAddSystemBlock('constant', 'Const')}>
+              <Hash className="mr-2 h-4 w-4" />
+              Add Constant
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => handleAddSystemBlock('signalGenerator', 'SigGen')}>
+              <Activity className="mr-2 h-4 w-4" />
+              Add Signal Generator
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={() => handleAddSystemBlock('scope', 'Scope')}>
+              <LineChart className="mr-2 h-4 w-4" />
+              Add Scope
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => handleAddSystemBlock('display', 'Display')}>
+              <Monitor className="mr-2 h-4 w-4" />
+              Add Display
+            </ContextMenuItem>
+          </>
+        ) : (
+          <>
+            {/* Chart view items */}
+            <ContextMenuItem onClick={handleAddState}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add State
+            </ContextMenuItem>
+            <ContextMenuItem onClick={handleAddAnnotation}>
+              <StickyNote className="mr-2 h-4 w-4" />
+              Add Annotation
+            </ContextMenuItem>
+          </>
+        )}
 
         <ContextMenuSeparator />
 
@@ -165,8 +240,8 @@ export function CanvasContextMenu({
           Paste
         </ContextMenuItem>
 
-        {/* -- Multi-selection actions (≥2 nodes) -- */}
-        {hasMultiSelection && (
+        {/* -- Multi-selection actions (chart view only, ≥2 nodes) -- */}
+        {!isSystemView && hasMultiSelection && (
           <>
             <ContextMenuSeparator />
 

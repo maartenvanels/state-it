@@ -9,6 +9,12 @@ import {
   ZoomOut,
   Maximize2,
   CircleDot,
+  ChevronDown,
+  LayoutGrid,
+  Hash,
+  Activity,
+  LineChart,
+  Monitor,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -17,10 +23,19 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useUIStore } from '@/lib/store/ui-store';
 import { useCanvasStore } from '@/lib/store/canvas-store';
 import { useProjectStore } from '@/lib/store/project-store';
 import { useNavigationStore } from '@/lib/store/navigation-store';
+import { deserializeSystemToCanvas } from '@/lib/persistence/serializer';
+import type { SystemBlockType } from '@/lib/types/system';
 
 export function Toolbar() {
   const interactionMode = useUIStore((s) => s.interactionMode);
@@ -31,6 +46,7 @@ export function Toolbar() {
   const activeView = useNavigationStore((s) => s.activeView);
   const isSystemView = activeView.type === 'system';
   const addChart = useProjectStore((s) => s.addChart);
+  const addSystemBlock = useProjectStore((s) => s.addSystemBlock);
 
   const selectedStateNode = selectedNodeIds.length === 1
     ? nodes.find((n) => n.id === selectedNodeIds[0] && n.type === 'stateNode')
@@ -47,6 +63,31 @@ export function Toolbar() {
       },
       selectedStateNode.parentId ?? null
     );
+  };
+
+  const reloadSystemCanvas = () => {
+    const project = useProjectStore.getState().currentProject;
+    if (!project) return;
+    const { nodes: newNodes, edges: newEdges } = deserializeSystemToCanvas(project);
+    useCanvasStore.getState().setNodes(newNodes);
+    useCanvasStore.getState().setEdges(newEdges);
+  };
+
+  const handleAddChart = () => {
+    const chartId = addChart(`Chart_${Date.now() % 1000}`);
+    if (chartId) reloadSystemCanvas();
+  };
+
+  const handleAddBlock = (type: SystemBlockType, name: string) => {
+    const blockCount = useProjectStore.getState().currentProject?.systemBlocks.filter(
+      (b) => b.type === type
+    ).length ?? 0;
+    addSystemBlock(
+      type,
+      `${name}_${blockCount + 1}`,
+      { x: 100 + blockCount * 200, y: 300 }
+    );
+    reloadSystemCanvas();
   };
 
   return (
@@ -66,25 +107,43 @@ export function Toolbar() {
       </Tooltip>
 
       {isSystemView ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => {
-                const chartId = addChart(`Chart_${Date.now() % 1000}`);
-                if (chartId) {
-                  // Reload system canvas with the new chart block
-                  useNavigationStore.getState().navigateToSystem();
-                }
-              }}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Add Chart</TooltipContent>
-        </Tooltip>
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 gap-1 px-2">
+                  <Plus className="h-4 w-4" />
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Add Block</TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onClick={handleAddChart}>
+              <LayoutGrid className="mr-2 h-4 w-4" />
+              Chart
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => handleAddBlock('constant', 'Const')}>
+              <Hash className="mr-2 h-4 w-4" />
+              Constant
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleAddBlock('signalGenerator', 'SigGen')}>
+              <Activity className="mr-2 h-4 w-4" />
+              Signal Generator
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => handleAddBlock('scope', 'Scope')}>
+              <LineChart className="mr-2 h-4 w-4" />
+              Scope
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleAddBlock('display', 'Display')}>
+              <Monitor className="mr-2 h-4 w-4" />
+              Display
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       ) : (
         <>
           <Tooltip>

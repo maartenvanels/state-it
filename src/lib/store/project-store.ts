@@ -4,7 +4,8 @@ import { create } from 'zustand';
 import type { Project, ProjectMeta, ProjectSettings } from '../types/project';
 import { DEFAULT_PROJECT_SETTINGS } from '../types/project';
 import type { Chart, Port } from '../types/chart';
-import type { SystemBlock } from '../types/system';
+import type { SystemBlock, SystemBlockType, SystemWire } from '../types/system';
+import { DEFAULT_BLOCK_CONFIGS, DEFAULT_BLOCK_SIZES } from '../types/system';
 import type { Variable } from '../types/variable';
 import type { CanvasNode, TransitionEdge } from '../types/canvas';
 import { generateId } from '../utils/id-generator';
@@ -37,7 +38,14 @@ interface ProjectActions {
   removeVariable: (chartId: string, varId: string) => void;
 
   // System block management
+  addSystemBlock: (type: SystemBlockType, name: string, position: { x: number; y: number }) => string;
+  removeSystemBlock: (blockId: string) => void;
   updateSystemBlock: (blockId: string, updates: Partial<SystemBlock>) => void;
+
+  // System wire management
+  addSystemWire: (wire: Omit<SystemWire, 'id'>) => string;
+  removeSystemWire: (wireId: string) => void;
+  removeSystemWires: (wireIds: string[]) => void;
 
   // Flush canvas state back into project data
   flushCanvasToChart: (
@@ -48,6 +56,7 @@ interface ProjectActions {
   ) => void;
   flushCanvasToSystem: (
     nodes: CanvasNode[],
+    edges: TransitionEdge[],
     viewport?: { x: number; y: number; zoom: number }
   ) => void;
 
@@ -287,6 +296,47 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
 
     // ─── System Block Management ──────────────────────────────
 
+    addSystemBlock: (type, name, position) => {
+      const current = get().currentProject;
+      if (!current) return '';
+      const id = generateId();
+      const block: SystemBlock = {
+        id,
+        type,
+        name,
+        chartId: null,
+        position,
+        size: { ...DEFAULT_BLOCK_SIZES[type] },
+        config: { ...DEFAULT_BLOCK_CONFIGS[type] },
+      };
+      set({
+        currentProject: {
+          ...current,
+          systemBlocks: [...current.systemBlocks, block],
+          updatedAt: new Date().toISOString(),
+        },
+        isDirty: true,
+      });
+      return id;
+    },
+
+    removeSystemBlock: (blockId) => {
+      const current = get().currentProject;
+      if (!current) return;
+      // Also remove any wires connected to this block
+      set({
+        currentProject: {
+          ...current,
+          systemBlocks: current.systemBlocks.filter((b) => b.id !== blockId),
+          systemWires: current.systemWires.filter(
+            (w) => w.sourceBlockId !== blockId && w.targetBlockId !== blockId
+          ),
+          updatedAt: new Date().toISOString(),
+        },
+        isDirty: true,
+      });
+    },
+
     updateSystemBlock: (blockId, updates) => {
       const current = get().currentProject;
       if (!current) return;
@@ -296,6 +346,50 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
           systemBlocks: current.systemBlocks.map((b) =>
             b.id === blockId ? { ...b, ...updates } : b
           ),
+          updatedAt: new Date().toISOString(),
+        },
+        isDirty: true,
+      });
+    },
+
+    // ─── System Wire Management ────────────────────────────────
+
+    addSystemWire: (wire) => {
+      const current = get().currentProject;
+      if (!current) return '';
+      const id = generateId();
+      set({
+        currentProject: {
+          ...current,
+          systemWires: [...current.systemWires, { ...wire, id }],
+          updatedAt: new Date().toISOString(),
+        },
+        isDirty: true,
+      });
+      return id;
+    },
+
+    removeSystemWire: (wireId) => {
+      const current = get().currentProject;
+      if (!current) return;
+      set({
+        currentProject: {
+          ...current,
+          systemWires: current.systemWires.filter((w) => w.id !== wireId),
+          updatedAt: new Date().toISOString(),
+        },
+        isDirty: true,
+      });
+    },
+
+    removeSystemWires: (wireIds) => {
+      const current = get().currentProject;
+      if (!current) return;
+      const idSet = new Set(wireIds);
+      set({
+        currentProject: {
+          ...current,
+          systemWires: current.systemWires.filter((w) => !idSet.has(w.id)),
           updatedAt: new Date().toISOString(),
         },
         isDirty: true,
@@ -323,15 +417,21 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
       });
     },
 
-    flushCanvasToSystem: (nodes, viewport) => {
+    flushCanvasToSystem: (nodes, edges, viewport) => {
       const current = get().currentProject;
       if (!current) return;
 
-      const updatedBlocks = serializeSystemCanvas(current.systemBlocks, nodes);
+      const { blocks, wires } = serializeSystemCanvas(
+        current.systemBlocks,
+        current.systemWires,
+        nodes,
+        edges
+      );
       set({
         currentProject: {
           ...current,
-          systemBlocks: updatedBlocks,
+          systemBlocks: blocks,
+          systemWires: wires,
           ...(viewport ? { systemViewport: viewport } : {}),
           updatedAt: new Date().toISOString(),
         },

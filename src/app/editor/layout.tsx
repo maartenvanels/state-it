@@ -64,6 +64,7 @@ export default function EditorLayout({
       } else {
         useProjectStore.getState().flushCanvasToSystem(
           canvasState.nodes,
+          canvasState.edges,
           canvasState.viewport
         );
       }

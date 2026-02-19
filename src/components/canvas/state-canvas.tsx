@@ -25,10 +25,14 @@ import { TransitionEdge } from './transition-edge';
 import { DefaultTransitionNode } from './default-transition-node';
 import { AnnotationNode } from './annotation-node';
 import { ChartBlockNode } from './chart-block-node';
+import { SourceBlockNode } from './source-block-node';
+import { SinkBlockNode } from './sink-block-node';
+import { SystemWireEdge } from './system-wire-edge';
 import { CanvasContextMenu } from './canvas-context-menu';
 import type { TransitionEdge as TransitionEdgeType, CanvasNode } from '@/lib/types/canvas';
 import { snapToGrid, isDescendantOf, getNodeSize } from '@/lib/utils/geometry';
 import { SimulationToolbar } from './simulation-toolbar';
+import { generateId } from '@/lib/utils/id-generator';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const nodeTypes: Record<string, any> = {
@@ -36,15 +40,22 @@ const nodeTypes: Record<string, any> = {
   defaultTransition: DefaultTransitionNode,
   annotationNode: AnnotationNode,
   chartBlock: ChartBlockNode,
+  sourceBlock: SourceBlockNode,
+  sinkBlock: SinkBlockNode,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const edgeTypes: Record<string, any> = {
   transition: TransitionEdge,
+  systemWire: SystemWireEdge,
 };
 
-const defaultEdgeOptions = {
+const chartEdgeOptions = {
   type: 'transition',
+};
+
+const systemEdgeOptions = {
+  type: 'systemWire',
 };
 
 export function StateCanvas() {
@@ -228,6 +239,35 @@ export function StateCanvas() {
     setIsConnecting(false);
   }, [setIsConnecting]);
 
+  // System view: handle onConnect by adding system wire
+  const handleSystemConnect = useCallback(
+    (connection: Connection) => {
+      if (!connection.source || !connection.target) return;
+      const wireId = generateId();
+      useProjectStore.getState().addSystemWire({
+        sourceBlockId: connection.source,
+        sourcePortId: connection.sourceHandle ?? '',
+        targetBlockId: connection.target,
+        targetPortId: connection.targetHandle ?? '',
+      });
+      // Also add the edge to the canvas for immediate display
+      const newEdge = {
+        id: `wire-${wireId}`,
+        source: connection.source,
+        target: connection.target,
+        sourceHandle: connection.sourceHandle,
+        targetHandle: connection.targetHandle,
+        type: 'systemWire',
+        data: { wireId },
+      };
+      useCanvasStore.getState().setEdges([
+        ...useCanvasStore.getState().edges,
+        newEdge as unknown as TransitionEdgeType,
+      ]);
+    },
+    []
+  );
+
   const isValidConnection = useCallback(
     (connection: Connection | TransitionEdgeType) => {
       const source = 'source' in connection ? connection.source : null;
@@ -236,10 +276,9 @@ export function StateCanvas() {
       if (source === target) return false;
       const targetNode = nodes.find((n) => n.id === target);
       if (!targetNode) return false;
-      // In chart view, only connect to stateNodes
-      // In system view, allow chartBlock connections (Phase C wiring)
       if (isSystemView) {
-        return targetNode.type === 'chartBlock';
+        // System view: target must be a block with an input handle
+        return targetNode.type === 'chartBlock' || targetNode.type === 'sinkBlock';
       }
       if (targetNode.type !== 'stateNode') return false;
       return true;
@@ -262,13 +301,46 @@ export function StateCanvas() {
 
       // Delete selected items
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedNodeIds.length > 0) {
-          removeNodes(selectedNodeIds);
+        if (isSystemView) {
+          // System view: remove blocks + wires from project store
+          if (selectedNodeIds.length > 0) {
+            for (const nodeId of selectedNodeIds) {
+              const node = nodes.find((n) => n.id === nodeId);
+              if (node?.type === 'chartBlock') {
+                // Find the chart block's chartId and remove the chart
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const chartId = (node.data as any)?.chartId;
+                if (chartId) useProjectStore.getState().removeChart(chartId);
+              } else {
+                useProjectStore.getState().removeSystemBlock(nodeId);
+              }
+            }
+            removeNodes(selectedNodeIds);
+          }
+          if (selectedEdgeIds.length > 0) {
+            // Extract wire IDs from edge data
+            const wireIds = selectedEdgeIds
+              .map((edgeId) => {
+                const edge = edges.find((e) => e.id === edgeId);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                return (edge?.data as any)?.wireId as string | undefined;
+              })
+              .filter(Boolean) as string[];
+            if (wireIds.length > 0) {
+              useProjectStore.getState().removeSystemWires(wireIds);
+            }
+            removeEdges(selectedEdgeIds);
+          }
           setSelection([], []);
-        }
-        if (selectedEdgeIds.length > 0) {
-          removeEdges(selectedEdgeIds);
-          setSelection([], []);
+        } else {
+          if (selectedNodeIds.length > 0) {
+            removeNodes(selectedNodeIds);
+            setSelection([], []);
+          }
+          if (selectedEdgeIds.length > 0) {
+            removeEdges(selectedEdgeIds);
+            setSelection([], []);
+          }
         }
       }
 
@@ -277,8 +349,8 @@ export function StateCanvas() {
         setInteractionMode('select');
       }
 
-      // S = add state mode
-      if (e.key === 's' && !e.ctrlKey && !e.metaKey) {
+      // S = add state mode (chart view only)
+      if (e.key === 's' && !e.ctrlKey && !e.metaKey && !isSystemView) {
         setInteractionMode('addState');
       }
 
@@ -313,6 +385,9 @@ export function StateCanvas() {
     removeEdges,
     setSelection,
     setInteractionMode,
+    isSystemView,
+    nodes,
+    edges,
   ]);
 
   // Wire zoom buttons
@@ -374,8 +449,8 @@ export function StateCanvas() {
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onReconnect={onReconnect}
+          onConnect={isSystemView ? handleSystemConnect : onConnect}
+          onReconnect={isSystemView ? undefined : onReconnect}
           onReconnectStart={handleConnectStart}
           onReconnectEnd={handleConnectEnd}
           onConnectStart={handleConnectStart}
@@ -390,7 +465,7 @@ export function StateCanvas() {
           connectionRadius={40}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
-          defaultEdgeOptions={defaultEdgeOptions}
+          defaultEdgeOptions={isSystemView ? systemEdgeOptions : chartEdgeOptions}
           snapToGrid={snapEnabled}
           snapGrid={[gridSize, gridSize]}
           fitView
@@ -429,6 +504,12 @@ export function StateCanvas() {
               }
               if (node.type === 'chartBlock') {
                 return 'var(--primary)';
+              }
+              if (node.type === 'sourceBlock') {
+                return '#10b981'; // emerald
+              }
+              if (node.type === 'sinkBlock') {
+                return '#8b5cf6'; // violet
               }
               return 'var(--muted)';
             }}

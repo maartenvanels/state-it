@@ -15,6 +15,10 @@ import {
   BookOpen,
   StickyNote,
   LayoutGrid,
+  Hash,
+  Activity,
+  LineChart,
+  Monitor,
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import type { CanvasNode } from '@/lib/types/canvas';
@@ -46,7 +50,7 @@ export function Sidebar() {
         <TabsList className="mx-2 mt-2 grid w-auto grid-cols-3">
           <TabsTrigger value="hierarchy" className="text-xs">
             {isSystemView ? (
-              <><LayoutGrid className="mr-1 h-3 w-3" />Charts</>
+              <><LayoutGrid className="mr-1 h-3 w-3" />Blocks</>
             ) : (
               <><GitBranchPlus className="mr-1 h-3 w-3" />States</>
             )}
@@ -64,7 +68,7 @@ export function Sidebar() {
         <TabsContent value="hierarchy" className="flex-1 m-0">
           <ScrollArea className="h-full p-2">
             {isSystemView ? (
-              <ChartListPanel />
+              <SystemBlockListPanel />
             ) : (
               <>
                 {stateNodes.length === 0 ? (
@@ -215,35 +219,124 @@ function StateTreeItem({ node, depth }: { node: CanvasNode; depth: number }) {
   );
 }
 
-function ChartListPanel() {
+function SystemBlockListPanel() {
   const charts = useProjectStore((s) => s.currentProject?.charts ?? []);
+  const blocks = useProjectStore((s) => s.currentProject?.systemBlocks ?? []);
   const navigateToChart = useNavigationStore((s) => s.navigateToChart);
+  const selectedNodeIds = useUIStore((s) => s.selectedNodeIds);
+  const setSelection = useUIStore((s) => s.setSelection);
 
-  if (charts.length === 0) {
+  const sourceBlocks = blocks.filter(
+    (b) => b.type === 'constant' || b.type === 'signalGenerator'
+  );
+  const sinkBlocks = blocks.filter(
+    (b) => b.type === 'scope' || b.type === 'display'
+  );
+
+  const blockIcon = (type: string) => {
+    switch (type) {
+      case 'constant': return <Hash className="mr-1.5 h-3 w-3 flex-shrink-0 text-emerald-600" />;
+      case 'signalGenerator': return <Activity className="mr-1.5 h-3 w-3 flex-shrink-0 text-emerald-600" />;
+      case 'scope': return <LineChart className="mr-1.5 h-3 w-3 flex-shrink-0 text-violet-600" />;
+      case 'display': return <Monitor className="mr-1.5 h-3 w-3 flex-shrink-0 text-violet-600" />;
+      default: return null;
+    }
+  };
+
+  if (blocks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center text-sm text-muted-foreground">
         <LayoutGrid className="mb-2 h-8 w-8 opacity-50" />
-        <p>No charts yet</p>
-        <p className="text-xs mt-1">Click + to add a chart</p>
+        <p>No blocks yet</p>
+        <p className="text-xs mt-1">Click + to add a block</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-0.5">
-      {charts.map((chart) => (
-        <button
-          key={chart.id}
-          className="flex w-full items-center rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent"
-          onDoubleClick={() => navigateToChart(chart.id)}
-        >
-          <LayoutGrid className="mr-1.5 h-3 w-3 flex-shrink-0 text-primary" />
-          <span className="truncate font-medium">{chart.name}</span>
-          <span className="ml-auto text-[9px] text-muted-foreground">
-            {chart.states.length} states
-          </span>
-        </button>
-      ))}
+    <div>
+      {/* Charts section */}
+      {charts.length > 0 && (
+        <>
+          <div className="px-1 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+            Charts ({charts.length})
+          </div>
+          <div className="space-y-0.5 mb-2">
+            {charts.map((chart) => {
+              const block = blocks.find((b) => b.chartId === chart.id);
+              const isSelected = block ? selectedNodeIds.includes(block.id) : false;
+              return (
+                <button
+                  key={chart.id}
+                  className={`flex w-full items-center rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent ${
+                    isSelected ? 'bg-accent text-accent-foreground font-medium' : ''
+                  }`}
+                  onClick={() => block && setSelection([block.id], [])}
+                  onDoubleClick={() => navigateToChart(chart.id)}
+                >
+                  <LayoutGrid className="mr-1.5 h-3 w-3 flex-shrink-0 text-primary" />
+                  <span className="truncate font-medium">{chart.name}</span>
+                  <span className="ml-auto text-[9px] text-muted-foreground">
+                    {chart.states.length} states
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* Sources section */}
+      {sourceBlocks.length > 0 && (
+        <>
+          <Separator className="my-2" />
+          <div className="px-1 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+            Sources ({sourceBlocks.length})
+          </div>
+          <div className="space-y-0.5 mb-2">
+            {sourceBlocks.map((block) => (
+              <button
+                key={block.id}
+                className={`flex w-full items-center rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent ${
+                  selectedNodeIds.includes(block.id)
+                    ? 'bg-accent text-accent-foreground font-medium'
+                    : ''
+                }`}
+                onClick={() => setSelection([block.id], [])}
+              >
+                {blockIcon(block.type)}
+                <span className="truncate">{block.name}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Sinks section */}
+      {sinkBlocks.length > 0 && (
+        <>
+          <Separator className="my-2" />
+          <div className="px-1 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+            Sinks ({sinkBlocks.length})
+          </div>
+          <div className="space-y-0.5">
+            {sinkBlocks.map((block) => (
+              <button
+                key={block.id}
+                className={`flex w-full items-center rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent ${
+                  selectedNodeIds.includes(block.id)
+                    ? 'bg-accent text-accent-foreground font-medium'
+                    : ''
+                }`}
+                onClick={() => setSelection([block.id], [])}
+              >
+                {blockIcon(block.type)}
+                <span className="truncate">{block.name}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

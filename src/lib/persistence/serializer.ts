@@ -9,8 +9,11 @@ import type {
   DefaultTransitionNode,
   AnnotationNode,
   ChartBlockNode,
+  SourceBlockNode,
+  SinkBlockNode,
+  SystemWireEdge,
 } from '../types/canvas';
-import type { SystemBlock } from '../types/system';
+import type { SystemBlock, SystemWire } from '../types/system';
 import { DEFAULT_STATE_SIZE } from '../types/state';
 import { EMPTY_TRANSITION_LABEL } from '../types/transition';
 import { DEFAULT_ANNOTATION_SIZE } from '../utils/constants';
@@ -185,14 +188,16 @@ export function deserializeChartToCanvas(chart: Chart): {
 // ─── System Serialization ───────────────────────────────────────
 
 /**
- * Serialize the system canvas back into system blocks
- * Updates positions/sizes from the canvas nodes
+ * Serialize the system canvas back into system blocks + wires
+ * Updates positions/sizes from the canvas nodes, wires from edges
  */
 export function serializeSystemCanvas(
   currentBlocks: SystemBlock[],
-  nodes: CanvasNode[]
-): SystemBlock[] {
-  return currentBlocks.map((block) => {
+  currentWires: SystemWire[],
+  nodes: CanvasNode[],
+  edges: TransitionEdge[]
+): { blocks: SystemBlock[]; wires: SystemWire[] } {
+  const blocks = currentBlocks.map((block) => {
     const node = nodes.find((n) => n.id === block.id);
     if (!node) return block;
     return {
@@ -204,10 +209,27 @@ export function serializeSystemCanvas(
       },
     };
   });
+
+  // Serialize wire edges back to SystemWire data
+  const wires: SystemWire[] = [];
+  for (const edge of edges) {
+    if (edge.type === 'systemWire' && edge.data) {
+      const wireData = edge.data as unknown as { wireId: string };
+      wires.push({
+        id: wireData.wireId ?? edge.id,
+        sourceBlockId: edge.source,
+        sourcePortId: edge.sourceHandle ?? '',
+        targetBlockId: edge.target,
+        targetPortId: edge.targetHandle ?? '',
+      });
+    }
+  }
+
+  return { blocks, wires };
 }
 
 /**
- * Deserialize system blocks into canvas nodes for the system view
+ * Deserialize system blocks + wires into canvas nodes and edges
  */
 export function deserializeSystemToCanvas(project: Project): {
   nodes: CanvasNode[];
@@ -234,11 +256,57 @@ export function deserializeSystemToCanvas(project: Project): {
         },
       };
       nodes.push(chartNode);
+    } else if (block.type === 'constant' || block.type === 'signalGenerator') {
+      const sourceNode: SourceBlockNode = {
+        id: block.id,
+        type: 'sourceBlock',
+        position: block.position,
+        data: {
+          blockType: block.type,
+          name: block.name,
+          config: { ...block.config },
+        },
+        style: {
+          width: block.size.width,
+          height: block.size.height,
+        },
+      };
+      nodes.push(sourceNode);
+    } else if (block.type === 'scope' || block.type === 'display') {
+      const sinkNode: SinkBlockNode = {
+        id: block.id,
+        type: 'sinkBlock',
+        position: block.position,
+        data: {
+          blockType: block.type,
+          name: block.name,
+          config: { ...block.config },
+        },
+        style: {
+          width: block.size.width,
+          height: block.size.height,
+        },
+      };
+      nodes.push(sinkNode);
     }
-    // Phase C will add: constant, signalGenerator, scope, display, etc.
   }
 
-  // Phase C will add: system wires as edges
+  // Deserialize system wires as edges
+  for (const wire of project.systemWires) {
+    const wireEdge: SystemWireEdge = {
+      id: `wire-${wire.id}`,
+      source: wire.sourceBlockId,
+      target: wire.targetBlockId,
+      sourceHandle: wire.sourcePortId || undefined,
+      targetHandle: wire.targetPortId || undefined,
+      type: 'systemWire',
+      data: {
+        wireId: wire.id,
+      },
+    };
+    // Cast to TransitionEdge for canvas store compatibility
+    edges.push(wireEdge as unknown as TransitionEdge);
+  }
 
   return { nodes, edges };
 }

@@ -42,7 +42,7 @@ export function MenubarNav() {
         activeView.chartId, canvasState.nodes, canvasState.edges, canvasState.viewport
       );
     } else {
-      useProjectStore.getState().flushCanvasToSystem(canvasState.nodes, canvasState.viewport);
+      useProjectStore.getState().flushCanvasToSystem(canvasState.nodes, canvasState.edges, canvasState.viewport);
     }
 
     const flushedProject = useProjectStore.getState().currentProject;

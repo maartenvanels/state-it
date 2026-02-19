@@ -56,7 +56,7 @@ export function OpenProjectDialog({
         activeView.chartId, canvasState.nodes, canvasState.edges, canvasState.viewport
       );
     } else {
-      useProjectStore.getState().flushCanvasToSystem(canvasState.nodes, canvasState.viewport);
+      useProjectStore.getState().flushCanvasToSystem(canvasState.nodes, canvasState.edges, canvasState.viewport);
     }
     const flushed = useProjectStore.getState().currentProject;
     if (flushed) saveProject(flushed);

@@ -6,6 +6,9 @@ import { Settings2 } from 'lucide-react';
 import { StateProperties } from './state-properties';
 import { TransitionProperties } from './transition-properties';
 import { AnnotationProperties } from './annotation-properties';
+import { SourceBlockProperties } from './source-block-properties';
+import { SinkBlockProperties } from './sink-block-properties';
+import { ChartBlockProperties } from './chart-block-properties';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 export function PropertiesPanel() {
@@ -36,6 +39,30 @@ export function PropertiesPanel() {
     return (
       <ScrollArea className="h-full">
         <AnnotationProperties nodeId={selectedNode.id} data={selectedNode.data} />
+      </ScrollArea>
+    );
+  }
+
+  if (selectedNode && selectedNode.type === 'chartBlock') {
+    return (
+      <ScrollArea className="h-full">
+        <ChartBlockProperties nodeId={selectedNode.id} data={selectedNode.data} />
+      </ScrollArea>
+    );
+  }
+
+  if (selectedNode && selectedNode.type === 'sourceBlock') {
+    return (
+      <ScrollArea className="h-full">
+        <SourceBlockProperties nodeId={selectedNode.id} data={selectedNode.data} />
+      </ScrollArea>
+    );
+  }
+
+  if (selectedNode && selectedNode.type === 'sinkBlock') {
+    return (
+      <ScrollArea className="h-full">
+        <SinkBlockProperties nodeId={selectedNode.id} data={selectedNode.data} />
       </ScrollArea>
     );
   }

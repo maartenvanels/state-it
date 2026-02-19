@@ -70,6 +70,7 @@ export const useNavigationStore = create<NavigationState & NavigationActions>()(
       if (currentView.type === 'system') {
         projectStore.flushCanvasToSystem(
           canvasStore.nodes,
+          canvasStore.edges,
           canvasStore.viewport
         );
       } else if (currentView.type === 'chart' && currentView.chartId !== chartId) {

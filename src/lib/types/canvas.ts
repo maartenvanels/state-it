@@ -41,21 +41,46 @@ export interface ChartBlockNodeData {
   [key: string]: unknown;
 }
 
+export interface SourceBlockNodeData {
+  blockType: 'constant' | 'signalGenerator';
+  name: string;
+  config: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface SinkBlockNodeData {
+  blockType: 'scope' | 'display';
+  name: string;
+  config: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface SystemWireEdgeData {
+  wireId: string;
+  [key: string]: unknown;
+}
+
 export type StateNode = Node<StateNodeData, 'stateNode'>;
 export type DefaultTransitionNode = Node<DefaultTransitionNodeData, 'defaultTransition'>;
 export type AnnotationNode = Node<AnnotationNodeData, 'annotationNode'>;
 export type ChartBlockNode = Node<ChartBlockNodeData, 'chartBlock'>;
+export type SourceBlockNode = Node<SourceBlockNodeData, 'sourceBlock'>;
+export type SinkBlockNode = Node<SinkBlockNodeData, 'sinkBlock'>;
 export type TransitionEdge = Edge<TransitionEdgeData>;
+export type SystemWireEdge = Edge<SystemWireEdgeData>;
 
-export type CanvasNode = StateNode | DefaultTransitionNode | AnnotationNode | ChartBlockNode;
+export type CanvasNode = StateNode | DefaultTransitionNode | AnnotationNode | ChartBlockNode | SourceBlockNode | SinkBlockNode;
 
 export const NODE_TYPES = {
   stateNode: 'stateNode',
   defaultTransition: 'defaultTransition',
   annotationNode: 'annotationNode',
   chartBlock: 'chartBlock',
+  sourceBlock: 'sourceBlock',
+  sinkBlock: 'sinkBlock',
 } as const;
 
 export const EDGE_TYPES = {
   transition: 'transition',
+  systemWire: 'systemWire',
 } as const;

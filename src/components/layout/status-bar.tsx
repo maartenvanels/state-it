@@ -30,28 +30,37 @@ export function StatusBar() {
     return chart?.name ?? 'Chart';
   });
 
+  const isSystemView = activeView.type === 'system';
   const stateCount = nodes.filter((n) => n.type === 'stateNode').length;
+  const blockCount = useProjectStore((s) => s.currentProject?.systemBlocks.length ?? 0);
+  const wireCount = useProjectStore((s) => s.currentProject?.systemWires.length ?? 0);
   const zoom = Math.round(viewport.zoom * 100);
   const selectionCount = selectedNodeIds.length + selectedEdgeIds.length;
 
   const validationSummary = useMemo(() => {
-    if (stateCount === 0) return { errors: 0, warnings: 0 };
+    if (isSystemView || stateCount === 0) return { errors: 0, warnings: 0 };
     const model = buildModel(nodes, edges, variables, projectName);
     const messages = validateModel(model);
     return {
       errors: messages.filter((m) => m.level === 'error').length,
       warnings: messages.filter((m) => m.level === 'warning').length,
     };
-  }, [nodes, edges, variables, projectName, stateCount]);
+  }, [nodes, edges, variables, projectName, stateCount, isSystemView]);
 
   return (
     <div className="flex h-6 items-center justify-between border-t bg-background px-3 text-xs text-muted-foreground">
       <div className="flex items-center gap-4">
-        <span>
-          {stateCount} state{stateCount !== 1 ? 's' : ''} · {edges.length}{' '}
-          transition{edges.length !== 1 ? 's' : ''}
-          {variables.length > 0 && ` · ${variables.length} var${variables.length !== 1 ? 's' : ''}`}
-        </span>
+        {isSystemView ? (
+          <span>
+            {blockCount} block{blockCount !== 1 ? 's' : ''} · {wireCount} wire{wireCount !== 1 ? 's' : ''}
+          </span>
+        ) : (
+          <span>
+            {stateCount} state{stateCount !== 1 ? 's' : ''} · {edges.length}{' '}
+            transition{edges.length !== 1 ? 's' : ''}
+            {variables.length > 0 && ` · ${variables.length} var${variables.length !== 1 ? 's' : ''}`}
+          </span>
+        )}
         {selectionCount > 0 && <span>{selectionCount} selected</span>}
         {validationSummary.errors > 0 && (
           <span className="text-destructive">
