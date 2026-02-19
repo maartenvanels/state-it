@@ -64,6 +64,16 @@ export function OpenProjectDialog({
 
   const handleOpen = () => {
     if (!selectedId) return;
+
+    // Warn about unsaved changes
+    const isDirty = useProjectStore.getState().isDirty;
+    if (isDirty) {
+      const confirmed = window.confirm(
+        'You have unsaved changes. Open a different project anyway?'
+      );
+      if (!confirmed) return;
+    }
+
     const project = loadProject(selectedId);
     if (!project) return;
 

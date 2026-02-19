@@ -235,10 +235,10 @@ function SystemBlockListPanel() {
 
   const blockIcon = (type: string) => {
     switch (type) {
-      case 'constant': return <Hash className="mr-1.5 h-3 w-3 flex-shrink-0 text-emerald-600" />;
-      case 'signalGenerator': return <Activity className="mr-1.5 h-3 w-3 flex-shrink-0 text-emerald-600" />;
-      case 'scope': return <LineChart className="mr-1.5 h-3 w-3 flex-shrink-0 text-violet-600" />;
-      case 'display': return <Monitor className="mr-1.5 h-3 w-3 flex-shrink-0 text-violet-600" />;
+      case 'constant': return <Hash className="mr-1.5 h-3 w-3 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />;
+      case 'signalGenerator': return <Activity className="mr-1.5 h-3 w-3 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />;
+      case 'scope': return <LineChart className="mr-1.5 h-3 w-3 flex-shrink-0 text-violet-600 dark:text-violet-400" />;
+      case 'display': return <Monitor className="mr-1.5 h-3 w-3 flex-shrink-0 text-violet-600 dark:text-violet-400" />;
       default: return null;
     }
   };

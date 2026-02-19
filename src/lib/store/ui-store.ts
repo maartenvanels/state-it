@@ -8,7 +8,8 @@ export type DialogType =
   | 'export'
   | 'settings'
   | 'variable'
-  | 'about';
+  | 'about'
+  | 'shortcuts';
 
 export type InteractionMode =
   | 'select'

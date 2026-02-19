@@ -30,6 +30,15 @@ export function NewProjectDialog({ open, onOpenChange }: NewProjectDialogProps) 
   const currentProject = useProjectStore((s) => s.currentProject);
 
   const handleCreate = () => {
+    // Warn about unsaved changes
+    const isDirty = useProjectStore.getState().isDirty;
+    if (isDirty) {
+      const confirmed = window.confirm(
+        'You have unsaved changes. Create a new project anyway?'
+      );
+      if (!confirmed) return;
+    }
+
     const projectName = name.trim() || 'Untitled Project';
 
     // Flush and save current project before switching

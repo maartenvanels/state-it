@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import {
   Menubar,
   MenubarContent,
@@ -14,21 +15,32 @@ import { useUIStore } from '@/lib/store/ui-store';
 import { useProjectStore } from '@/lib/store/project-store';
 import { useCanvasStore } from '@/lib/store/canvas-store';
 import { useNavigationStore } from '@/lib/store/navigation-store';
+import { useShallow } from 'zustand/react/shallow';
 import { ThemeToggle } from '@/components/shared/theme-toggle';
 import { saveProject } from '@/lib/persistence/storage';
-import { NewProjectDialog } from '@/components/dialogs/new-project-dialog';
-import { OpenProjectDialog } from '@/components/dialogs/open-project-dialog';
-import { ExportDialog } from '@/components/dialogs/export-dialog';
-import { SettingsDialog } from '@/components/dialogs/settings-dialog';
-import { AboutDialog } from '@/components/dialogs/about-dialog';
+
+const NewProjectDialog = dynamic(() => import('@/components/dialogs/new-project-dialog').then(mod => mod.NewProjectDialog));
+const OpenProjectDialog = dynamic(() => import('@/components/dialogs/open-project-dialog').then(mod => mod.OpenProjectDialog));
+const ExportDialog = dynamic(() => import('@/components/dialogs/export-dialog').then(mod => mod.ExportDialog), { ssr: false });
+const SettingsDialog = dynamic(() => import('@/components/dialogs/settings-dialog').then(mod => mod.SettingsDialog));
+const AboutDialog = dynamic(() => import('@/components/dialogs/about-dialog').then(mod => mod.AboutDialog));
+const ShortcutsDialog = dynamic(() => import('@/components/dialogs/shortcuts-dialog').then(mod => mod.ShortcutsDialog));
 
 export function MenubarNav() {
-  const activeDialog = useUIStore((s) => s.activeDialog);
-  const openDialog = useUIStore((s) => s.openDialog);
-  const closeDialog = useUIStore((s) => s.closeDialog);
-  const togglePanel = useUIStore((s) => s.togglePanel);
-  const projectName = useProjectStore((s) => s.currentProject?.name);
-  const isDirty = useProjectStore((s) => s.isDirty);
+  const { activeDialog, openDialog, closeDialog, togglePanel } = useUIStore(
+    useShallow((s) => ({
+      activeDialog: s.activeDialog,
+      openDialog: s.openDialog,
+      closeDialog: s.closeDialog,
+      togglePanel: s.togglePanel,
+    }))
+  );
+  const { projectName, isDirty } = useProjectStore(
+    useShallow((s) => ({
+      projectName: s.currentProject?.name,
+      isDirty: s.isDirty,
+    }))
+  );
 
   const handleSave = useCallback(() => {
     const project = useProjectStore.getState().currentProject;
@@ -50,7 +62,27 @@ export function MenubarNav() {
     useProjectStore.getState().markClean();
   }, []);
 
-  // Ctrl+S to save, Ctrl+N to new, Ctrl+O to open
+  const handleDelete = useCallback(() => {
+    const { selectedNodeIds, selectedEdgeIds } = useUIStore.getState();
+    const canvasStore = useCanvasStore.getState();
+    if (selectedNodeIds.length > 0) {
+      canvasStore.removeNodes(selectedNodeIds);
+    }
+    if (selectedEdgeIds.length > 0) {
+      canvasStore.removeEdges(selectedEdgeIds);
+    }
+    useUIStore.getState().setSelection([], []);
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    const { nodes, edges } = useCanvasStore.getState();
+    useUIStore.getState().setSelection(
+      nodes.map((n) => n.id),
+      edges.map((e) => e.id)
+    );
+  }, []);
+
+  // Ctrl+S to save, Ctrl+N to new, Ctrl+O to open, Ctrl+/ for shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -64,6 +96,10 @@ export function MenubarNav() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
         e.preventDefault();
         openDialog('openProject');
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault();
+        openDialog('shortcuts');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -118,7 +154,10 @@ export function MenubarNav() {
                 Redo <MenubarShortcut>Ctrl+Y</MenubarShortcut>
               </MenubarItem>
               <MenubarSeparator />
-              <MenubarItem>
+              <MenubarItem onClick={handleSelectAll}>
+                Select All <MenubarShortcut>Ctrl+A</MenubarShortcut>
+              </MenubarItem>
+              <MenubarItem onClick={handleDelete}>
                 Delete <MenubarShortcut>Del</MenubarShortcut>
               </MenubarItem>
             </MenubarContent>
@@ -146,6 +185,10 @@ export function MenubarNav() {
           <MenubarMenu>
             <MenubarTrigger className="text-sm">Help</MenubarTrigger>
             <MenubarContent>
+              <MenubarItem onClick={() => openDialog('shortcuts')}>
+                Keyboard Shortcuts <MenubarShortcut>Ctrl+/</MenubarShortcut>
+              </MenubarItem>
+              <MenubarSeparator />
               <MenubarItem onClick={() => openDialog('about')}>
                 About State It
               </MenubarItem>
@@ -159,26 +202,42 @@ export function MenubarNav() {
       </div>
 
       {/* Dialogs */}
-      <NewProjectDialog
-        open={activeDialog === 'newProject'}
-        onOpenChange={(open) => !open && closeDialog()}
-      />
-      <OpenProjectDialog
-        open={activeDialog === 'openProject'}
-        onOpenChange={(open) => !open && closeDialog()}
-      />
-      <ExportDialog
-        open={activeDialog === 'export'}
-        onOpenChange={(open) => !open && closeDialog()}
-      />
-      <SettingsDialog
-        open={activeDialog === 'settings'}
-        onOpenChange={(open) => !open && closeDialog()}
-      />
-      <AboutDialog
-        open={activeDialog === 'about'}
-        onOpenChange={(open) => !open && closeDialog()}
-      />
+      {activeDialog === 'newProject' && (
+        <NewProjectDialog
+          open={true}
+          onOpenChange={(open) => !open && closeDialog()}
+        />
+      )}
+      {activeDialog === 'openProject' && (
+        <OpenProjectDialog
+          open={true}
+          onOpenChange={(open) => !open && closeDialog()}
+        />
+      )}
+      {activeDialog === 'export' && (
+        <ExportDialog
+          open={true}
+          onOpenChange={(open) => !open && closeDialog()}
+        />
+      )}
+      {activeDialog === 'settings' && (
+        <SettingsDialog
+          open={true}
+          onOpenChange={(open) => !open && closeDialog()}
+        />
+      )}
+      {activeDialog === 'about' && (
+        <AboutDialog
+          open={true}
+          onOpenChange={(open) => !open && closeDialog()}
+        />
+      )}
+      {activeDialog === 'shortcuts' && (
+        <ShortcutsDialog
+          open={true}
+          onOpenChange={(open) => !open && closeDialog()}
+        />
+      )}
     </>
   );
 }

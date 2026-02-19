@@ -7,6 +7,7 @@ import type { StateNodeData } from '@/lib/types/canvas';
 import { useCanvasStore } from '@/lib/store/canvas-store';
 import { useUIStore } from '@/lib/store/ui-store';
 import { useSimulationStore } from '@/lib/store/simulation-store';
+import { useShallow } from 'zustand/react/shallow';
 import { MIN_STATE_WIDTH, MIN_STATE_HEIGHT } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils';
 import { NodeContextMenu } from './node-context-menu';
@@ -42,11 +43,19 @@ type StateNodeType = Node<StateNodeData, 'stateNode'>;
 
 function StateNodeComponent({ id, data, selected }: NodeProps<StateNodeType>) {
   const { stateBlock } = data;
-  const isDropTarget = useUIStore((s) => s.dropTargetNodeId === id);
-  const isHighlighted = useUIStore((s) => s.collidingNodeIds.includes(id));
-  const isConnecting = useUIStore((s) => s.isConnecting);
-  const isSimActive = useSimulationStore((s) => s.isActive);
-  const isActiveState = useSimulationStore((s) => s.activeStateId === id);
+  const { isDropTarget, isHighlighted, isConnecting } = useUIStore(
+    useShallow((s) => ({
+      isDropTarget: s.dropTargetNodeId === id,
+      isHighlighted: s.collidingNodeIds.includes(id),
+      isConnecting: s.isConnecting
+    }))
+  );
+  const { isSimActive, isActiveState } = useSimulationStore(
+    useShallow((s) => ({
+      isSimActive: s.isActive,
+      isActiveState: s.activeStateId === id
+    }))
+  );
   const resizeNode = useCanvasStore((s) => s.resizeNode);
   const updateStateNodeData = useCanvasStore((s) => s.updateStateNodeData);
   const [isEditing, setIsEditing] = useState(false);

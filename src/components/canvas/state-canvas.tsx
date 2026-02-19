@@ -375,6 +375,17 @@ export function StateCanvas() {
         e.preventDefault();
         useCanvasStore.temporal.getState().redo();
       }
+
+      // Ctrl+A = select all
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        e.preventDefault();
+        const allNodes = useCanvasStore.getState().nodes;
+        const allEdges = useCanvasStore.getState().edges;
+        setSelection(
+          allNodes.map((n) => n.id),
+          allEdges.map((e) => e.id)
+        );
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);

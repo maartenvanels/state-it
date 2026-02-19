@@ -20,7 +20,7 @@ function Handle({ vertical = false }: { vertical?: boolean }) {
       className={`
         relative flex items-center justify-center bg-border
         ${vertical ? 'h-1' : 'w-1'}
-        hover:bg-blue-500 active:bg-blue-500 transition-colors
+        hover:bg-primary active:bg-primary transition-colors
         after:absolute after:inset-0
         ${vertical ? 'after:h-4 after:-translate-y-1/2 after:top-1/2' : 'after:w-4 after:-translate-x-1/2 after:left-1/2'}
       `}
@@ -65,34 +65,35 @@ export default function EditorContent() {
   }, [bottomPanelOpen]);
 
   // Sync panels → store (when user drags to collapse/expand)
+  // Read store imperatively to avoid dependency on panel state (prevents feedback loop)
   const onLeftResize = useCallback(
     (size: PanelSize) => {
       const collapsed = size.asPercentage === 0;
-      if (collapsed !== !leftPanelOpen) {
+      if (collapsed !== !useUIStore.getState().leftPanelOpen) {
         setPanelOpen('left', !collapsed);
       }
     },
-    [leftPanelOpen, setPanelOpen]
+    [setPanelOpen]
   );
 
   const onRightResize = useCallback(
     (size: PanelSize) => {
       const collapsed = size.asPercentage === 0;
-      if (collapsed !== !rightPanelOpen) {
+      if (collapsed !== !useUIStore.getState().rightPanelOpen) {
         setPanelOpen('right', !collapsed);
       }
     },
-    [rightPanelOpen, setPanelOpen]
+    [setPanelOpen]
   );
 
   const onBottomResize = useCallback(
     (size: PanelSize) => {
       const collapsed = size.asPercentage === 0;
-      if (collapsed !== !bottomPanelOpen) {
+      if (collapsed !== !useUIStore.getState().bottomPanelOpen) {
         setPanelOpen('bottom', !collapsed);
       }
     },
-    [bottomPanelOpen, setPanelOpen]
+    [setPanelOpen]
   );
 
   return (
