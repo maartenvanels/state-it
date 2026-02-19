@@ -97,7 +97,17 @@ export const useUIStore = create<UIState & UIActions>()((set) => ({
   isConnecting: false,
 
   setSelection: (nodeIds, edgeIds) =>
-    set({ selectedNodeIds: nodeIds, selectedEdgeIds: edgeIds }),
+    set((state) => {
+      // Skip update if selection unchanged (prevents onSelectionChange feedback loop)
+      const nodesEqual =
+        state.selectedNodeIds.length === nodeIds.length &&
+        state.selectedNodeIds.every((id, i) => id === nodeIds[i]);
+      const edgesEqual =
+        state.selectedEdgeIds.length === edgeIds.length &&
+        state.selectedEdgeIds.every((id, i) => id === edgeIds[i]);
+      if (nodesEqual && edgesEqual) return state;
+      return { selectedNodeIds: nodeIds, selectedEdgeIds: edgeIds };
+    }),
 
   togglePanel: (panel) =>
     set((state) => {
