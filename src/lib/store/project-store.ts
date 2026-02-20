@@ -242,12 +242,39 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
       const current = get().currentProject;
       if (!current) return '';
       const id = generateId();
+      const chart = current.charts.find((c) => c.id === chartId);
+      if (!chart) return '';
+
+      const isIO = variable.scope === 'input' || variable.scope === 'output';
+      let portId: string | undefined;
+      let ports = chart.ports;
+
+      // Auto-create port for input/output variables
+      if (isIO && !variable.portId) {
+        const newPortId = generateId();
+        portId = newPortId;
+        ports = [
+          ...ports,
+          {
+            id: newPortId,
+            name: variable.name,
+            direction: variable.scope as 'input' | 'output',
+            dataType: variable.dataType,
+            defaultValue: variable.initialValue || '0',
+          },
+        ];
+      }
+
       set({
         currentProject: {
           ...current,
           charts: current.charts.map((c) =>
             c.id === chartId
-              ? { ...c, variables: [...c.variables, { ...variable, id }] }
+              ? {
+                  ...c,
+                  variables: [...c.variables, { ...variable, id, ...(portId ? { portId } : {}) }],
+                  ports,
+                }
               : c
           ),
           updatedAt: new Date().toISOString(),
@@ -260,6 +287,49 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
     updateVariable: (chartId, varId, updates) => {
       const current = get().currentProject;
       if (!current) return;
+      const chart = current.charts.find((c) => c.id === chartId);
+      if (!chart) return;
+      const variable = chart.variables.find((v) => v.id === varId);
+      if (!variable) return;
+
+      const merged = { ...variable, ...updates };
+      const wasIO = variable.scope === 'input' || variable.scope === 'output';
+      const isIO = merged.scope === 'input' || merged.scope === 'output';
+      let ports = chart.ports;
+      let portId = variable.portId;
+
+      if (isIO && !wasIO) {
+        // Scope changed TO input/output → create port
+        const newPortId = generateId();
+        portId = newPortId;
+        ports = [
+          ...ports,
+          {
+            id: newPortId,
+            name: merged.name,
+            direction: merged.scope as 'input' | 'output',
+            dataType: merged.dataType,
+            defaultValue: merged.initialValue || '0',
+          },
+        ];
+      } else if (!isIO && wasIO && variable.portId) {
+        // Scope changed FROM input/output → remove port
+        ports = ports.filter((p) => p.id !== variable.portId);
+        portId = undefined;
+      } else if (isIO && variable.portId) {
+        // Still IO with port — sync name/type/direction to port
+        ports = ports.map((p) =>
+          p.id === variable.portId
+            ? {
+                ...p,
+                name: merged.name,
+                direction: merged.scope as 'input' | 'output',
+                dataType: merged.dataType,
+              }
+            : p
+        );
+      }
+
       set({
         currentProject: {
           ...current,
@@ -268,8 +338,9 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
               ? {
                   ...c,
                   variables: c.variables.map((v) =>
-                    v.id === varId ? { ...v, ...updates } : v
+                    v.id === varId ? { ...merged, portId } : v
                   ),
+                  ports,
                 }
               : c
           ),
@@ -282,12 +353,21 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
     removeVariable: (chartId, varId) => {
       const current = get().currentProject;
       if (!current) return;
+      const chart = current.charts.find((c) => c.id === chartId);
+      if (!chart) return;
+      const variable = chart.variables.find((v) => v.id === varId);
+
+      // Also remove the linked port
+      const ports = variable?.portId
+        ? chart.ports.filter((p) => p.id !== variable.portId)
+        : chart.ports;
+
       set({
         currentProject: {
           ...current,
           charts: current.charts.map((c) =>
             c.id === chartId
-              ? { ...c, variables: c.variables.filter((v) => v.id !== varId) }
+              ? { ...c, variables: c.variables.filter((v) => v.id !== varId), ports }
               : c
           ),
           updatedAt: new Date().toISOString(),

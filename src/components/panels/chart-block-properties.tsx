@@ -194,8 +194,10 @@ export function ChartBlockProperties({ nodeId, data }: Props) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="boolean">BOOL</SelectItem>
-                    <SelectItem value="int32">INT</SelectItem>
+                    <SelectItem value="int16">INT</SelectItem>
+                    <SelectItem value="int32">DINT</SelectItem>
                     <SelectItem value="float">REAL</SelectItem>
+                    <SelectItem value="double">LREAL</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button

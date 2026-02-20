@@ -22,7 +22,7 @@ export interface Variable {
   description: string;
   enumValues?: string[];
   arraySize?: number;
-  /** When set, this variable is auto-synced from a chart port and cannot be renamed/retyped. */
+  /** Links this variable to a chart port for bidirectional sync. */
   portId?: string;
 }
 

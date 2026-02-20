@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useProjectStore } from '@/lib/store/project-store';
 import { useNavigationStore } from '@/lib/store/navigation-store';
 import type { Variable, VariableScope, DataType } from '@/lib/types/variable';
-import { Plus, Trash2, ChevronRight, ChevronDown, Plug } from 'lucide-react';
+import { Plus, Trash2, ChevronRight, ChevronDown, Plug, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -16,17 +16,17 @@ const SCOPES: { value: VariableScope; label: string }[] = [
 ];
 
 const DATA_TYPES: { value: DataType; label: string }[] = [
-  { value: 'boolean', label: 'bool' },
-  { value: 'int8', label: 'i8' },
-  { value: 'int16', label: 'i16' },
-  { value: 'int32', label: 'i32' },
-  { value: 'uint8', label: 'u8' },
-  { value: 'uint16', label: 'u16' },
-  { value: 'uint32', label: 'u32' },
-  { value: 'float', label: 'f32' },
-  { value: 'double', label: 'f64' },
-  { value: 'string', label: 'str' },
-  { value: 'enum', label: 'enum' },
+  { value: 'boolean', label: 'BOOL' },
+  { value: 'int8', label: 'SINT' },
+  { value: 'int16', label: 'INT' },
+  { value: 'int32', label: 'DINT' },
+  { value: 'uint8', label: 'USINT' },
+  { value: 'uint16', label: 'UINT' },
+  { value: 'uint32', label: 'UDINT' },
+  { value: 'float', label: 'REAL' },
+  { value: 'double', label: 'LREAL' },
+  { value: 'string', label: 'STRING' },
+  { value: 'enum', label: 'ENUM' },
 ];
 
 const SCOPE_COLORS: Record<VariableScope, string> = {
@@ -78,6 +78,34 @@ export function VariableTable() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [newRowId, setNewRowId] = useState<string | null>(null);
   const newNameRef = useRef<HTMLInputElement>(null);
+
+  type SortKey = 'scope' | 'name' | 'type' | null;
+  const [sortKey, setSortKey] = useState<SortKey>(null);
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const toggleSort = useCallback((key: SortKey) => {
+    setSortKey((prev) => {
+      if (prev === key) {
+        setSortAsc((a) => !a);
+        return key;
+      }
+      setSortAsc(true);
+      return key;
+    });
+  }, []);
+
+  const SCOPE_ORDER: Record<VariableScope, number> = { input: 0, output: 1, local: 2, parameter: 3 };
+
+  const sortedVariables = useMemo(() => {
+    if (!sortKey) return variables;
+    const sorted = [...variables].sort((a, b) => {
+      if (sortKey === 'scope') return SCOPE_ORDER[a.scope] - SCOPE_ORDER[b.scope];
+      if (sortKey === 'name') return a.name.localeCompare(b.name);
+      if (sortKey === 'type') return a.dataType.localeCompare(b.dataType);
+      return 0;
+    });
+    return sortAsc ? sorted : sorted.reverse();
+  }, [variables, sortKey, sortAsc]);
 
   // Focus name input when a new row is added
   useEffect(() => {
@@ -152,15 +180,27 @@ export function VariableTable() {
         <table className="w-full text-[10px] font-mono border-collapse">
           <thead>
             <tr className="text-muted-foreground">
-              <th className="text-left py-1 px-1 font-medium w-[3.2rem]">Scope</th>
-              <th className="text-left py-1 px-1 font-medium">Name</th>
-              <th className="text-left py-1 px-1 font-medium w-[3.2rem]">Type</th>
+              <th className="text-left py-1 px-1 font-medium w-[3.2rem]">
+                <button onClick={() => toggleSort('scope')} className="flex items-center gap-0.5 hover:text-foreground">
+                  Scope{sortKey === 'scope' && <ArrowUpDown className="h-2 w-2" />}
+                </button>
+              </th>
+              <th className="text-left py-1 px-1 font-medium">
+                <button onClick={() => toggleSort('name')} className="flex items-center gap-0.5 hover:text-foreground">
+                  Name{sortKey === 'name' && <ArrowUpDown className="h-2 w-2" />}
+                </button>
+              </th>
+              <th className="text-left py-1 px-1 font-medium w-[3.2rem]">
+                <button onClick={() => toggleSort('type')} className="flex items-center gap-0.5 hover:text-foreground">
+                  Type{sortKey === 'type' && <ArrowUpDown className="h-2 w-2" />}
+                </button>
+              </th>
               <th className="text-left py-1 px-1 font-medium w-[3.5rem]">Init</th>
               <th className="w-5"></th>
             </tr>
           </thead>
           <tbody>
-            {variables.map((v) => (
+            {sortedVariables.map((v) => (
               <VariableRow
                 key={v.id}
                 variable={v}
@@ -255,8 +295,7 @@ function VariableRow({
           <select
             value={variable.scope}
             onChange={(e) => onUpdate({ scope: e.target.value as VariableScope })}
-            disabled={isPortBacked}
-            className="w-full bg-transparent border-0 outline-none text-[10px] font-mono font-medium cursor-pointer p-0 appearance-auto disabled:cursor-default disabled:opacity-70"
+            className="w-full bg-transparent border-0 outline-none text-[10px] font-mono font-medium cursor-pointer p-0 appearance-auto"
             style={{ color: SCOPE_COLORS[variable.scope] }}
           >
             {SCOPES.map((s) => (
@@ -294,12 +333,9 @@ function VariableRow({
               }}
               onBlur={commitName}
               onKeyDown={(e) => handleKeyDown(e, commitName)}
-              readOnly={isPortBacked}
               className={`w-full bg-transparent outline-none text-[10px] font-mono font-medium px-0.5 rounded ${nameError
                 ? 'ring-1 ring-destructive text-destructive'
-                : isPortBacked
-                  ? 'cursor-default opacity-70'
-                  : 'focus:ring-1 focus:ring-ring'
+                : 'focus:ring-1 focus:ring-ring'
                 }`}
               spellCheck={false}
             />
@@ -318,8 +354,7 @@ function VariableRow({
                 onToggleExpand();
               }
             }}
-            disabled={isPortBacked}
-            className="w-full bg-transparent border-0 outline-none text-[10px] font-mono cursor-pointer p-0 text-muted-foreground appearance-auto disabled:cursor-default disabled:opacity-70"
+            className="w-full bg-transparent border-0 outline-none text-[10px] font-mono cursor-pointer p-0 text-muted-foreground appearance-auto"
           >
             {DATA_TYPES.map((dt) => (
               <option key={dt.value} value={dt.value}>
@@ -345,18 +380,13 @@ function VariableRow({
 
         {/* Delete */}
         <td className="py-0.5 px-0.5">
-          {isPortBacked ? (
-            <span className="p-0.5 text-[8px] text-muted-foreground/40 select-none" title="Managed by port">
-              PORT
-            </span>
-          ) : (
-            <button
-              onClick={onDelete}
-              className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10"
-            >
-              <Trash2 className="h-2.5 w-2.5 text-muted-foreground hover:text-destructive" />
-            </button>
-          )}
+          <button
+            onClick={onDelete}
+            className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10"
+            title={isPortBacked ? 'Delete (also removes port)' : 'Delete'}
+          >
+            <Trash2 className="h-2.5 w-2.5 text-muted-foreground hover:text-destructive" />
+          </button>
         </td>
       </tr>
 

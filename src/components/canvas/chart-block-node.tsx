@@ -181,6 +181,36 @@ function ChartBlockNodeComponent({
           }}
         />
       ))}
+
+      {/* Default fallback handles when no ports defined for a direction */}
+      {inputPorts.length === 0 && (
+        <Handle
+          id="default-target"
+          type="target"
+          position={Position.Left}
+          style={{
+            top: '50%',
+            width: 8,
+            height: 8,
+            background: '#3b82f6',
+            border: '2px solid white',
+          }}
+        />
+      )}
+      {outputPorts.length === 0 && (
+        <Handle
+          id="default-source"
+          type="source"
+          position={Position.Right}
+          style={{
+            top: '50%',
+            width: 8,
+            height: 8,
+            background: '#f97316',
+            border: '2px solid white',
+          }}
+        />
+      )}
     </>
   );
 }
