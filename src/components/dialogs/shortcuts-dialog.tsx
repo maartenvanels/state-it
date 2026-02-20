@@ -26,6 +26,9 @@ const shortcuts = [
     items: [
       { keys: 'Ctrl+Z', action: 'Undo' },
       { keys: 'Ctrl+Y', action: 'Redo' },
+      { keys: 'Ctrl+C', action: 'Copy' },
+      { keys: 'Ctrl+V', action: 'Paste' },
+      { keys: 'Ctrl+D', action: 'Duplicate' },
       { keys: 'Ctrl+A', action: 'Select All' },
       { keys: 'Delete', action: 'Delete Selected' },
     ],

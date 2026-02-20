@@ -19,11 +19,13 @@ import {
   Activity,
   LineChart,
   Monitor,
+  Boxes,
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import type { CanvasNode } from '@/lib/types/canvas';
 import { VariableTable } from '@/components/panels/variable-table';
 import { HelpPanel } from '@/components/panels/help-panel';
+import { LibraryPanel } from '@/components/panels/library-panel';
 
 const EMPTY_ARRAY: never[] = [];
 
@@ -46,10 +48,10 @@ export function Sidebar() {
     <div className="flex h-full flex-col">
       <Tabs
         value={leftPanelTab}
-        onValueChange={(v) => setLeftPanelTab(v as 'hierarchy' | 'data' | 'help')}
+        onValueChange={(v) => setLeftPanelTab(v as 'hierarchy' | 'data' | 'help' | 'library')}
         className="flex-1 flex flex-col"
       >
-        <TabsList className="mx-2 mt-2 grid w-auto grid-cols-3">
+        <TabsList className={`mx-2 mt-2 grid w-auto ${isSystemView ? 'grid-cols-4' : 'grid-cols-3'}`}>
           <TabsTrigger value="hierarchy" className="text-xs">
             {isSystemView ? (
               <><LayoutGrid className="mr-1 h-3 w-3" />Blocks</>
@@ -57,6 +59,12 @@ export function Sidebar() {
               <><GitBranchPlus className="mr-1 h-3 w-3" />States</>
             )}
           </TabsTrigger>
+          {isSystemView && (
+            <TabsTrigger value="library" className="text-xs">
+              <Boxes className="mr-1 h-3 w-3" />
+              Library
+            </TabsTrigger>
+          )}
           <TabsTrigger value="data" className="text-xs">
             <Database className="mr-1 h-3 w-3" />
             Data
@@ -122,6 +130,10 @@ export function Sidebar() {
               </>
             )}
           </ScrollArea>
+        </TabsContent>
+
+        <TabsContent value="library" className="flex-1 m-0">
+          <LibraryPanel />
         </TabsContent>
 
         <TabsContent value="data" className="flex-1 m-0">

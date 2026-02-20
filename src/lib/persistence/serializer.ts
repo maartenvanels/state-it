@@ -11,8 +11,10 @@ import type {
   ChartBlockNode,
   SourceBlockNode,
   SinkBlockNode,
+  FunctionBlockNode,
   SystemWireEdge,
 } from '../types/canvas';
+import type { FunctionBlockConfig } from '../types/function-block';
 import type { SystemBlock, SystemWire } from '../types/system';
 import { DEFAULT_STATE_SIZE } from '../types/state';
 import { EMPTY_TRANSITION_LABEL } from '../types/transition';
@@ -288,6 +290,23 @@ export function deserializeSystemToCanvas(project: Project): {
         },
       };
       nodes.push(sinkNode);
+    } else if (block.type === 'functionBlock') {
+      const config = block.config as unknown as FunctionBlockConfig;
+      const fbNode: FunctionBlockNode = {
+        id: block.id,
+        type: 'functionBlock',
+        position: block.position,
+        data: {
+          defType: config.defType ?? 'math.add',
+          name: block.name,
+          params: config.params ?? {},
+        },
+        style: {
+          width: block.size.width,
+          height: block.size.height,
+        },
+      };
+      nodes.push(fbNode);
     }
   }
 

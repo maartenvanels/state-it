@@ -1,4 +1,4 @@
-export type SystemBlockType = 'chart' | 'constant' | 'signalGenerator' | 'scope' | 'display';
+export type SystemBlockType = 'chart' | 'constant' | 'signalGenerator' | 'scope' | 'display' | 'functionBlock';
 
 export interface SystemBlock {
   id: string;
@@ -53,6 +53,7 @@ export const DEFAULT_BLOCK_CONFIGS: Record<SystemBlockType, Record<string, unkno
   signalGenerator: { waveform: 'sine', amplitude: 1, frequency: 1, offset: 0, phase: 0 } satisfies SignalGeneratorConfig as unknown as Record<string, unknown>,
   scope: { timeWindow: 10, yMin: -1, yMax: 1, autoScale: true } satisfies ScopeConfig as unknown as Record<string, unknown>,
   display: { format: 'decimal', label: '' } satisfies DisplayConfig as unknown as Record<string, unknown>,
+  functionBlock: { defType: 'math.add', params: {} } as Record<string, unknown>,
 };
 
 export const DEFAULT_BLOCK_SIZES: Record<SystemBlockType, { width: number; height: number }> = {
@@ -61,4 +62,5 @@ export const DEFAULT_BLOCK_SIZES: Record<SystemBlockType, { width: number; heigh
   signalGenerator: { width: 180, height: 100 },
   scope: { width: 240, height: 160 },
   display: { width: 140, height: 80 },
+  functionBlock: { width: 120, height: 80 },
 };

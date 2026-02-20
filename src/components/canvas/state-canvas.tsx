@@ -27,6 +27,7 @@ import { AnnotationNode } from './annotation-node';
 import { ChartBlockNode } from './chart-block-node';
 import { SourceBlockNode } from './source-block-node';
 import { SinkBlockNode } from './sink-block-node';
+import { FunctionBlockNode } from './function-block-node';
 import { SystemWireEdge } from './system-wire-edge';
 import { CanvasContextMenu } from './canvas-context-menu';
 import type { TransitionEdge as TransitionEdgeType, CanvasNode } from '@/lib/types/canvas';
@@ -34,6 +35,10 @@ import { snapToGrid, isDescendantOf, getNodeSize } from '@/lib/utils/geometry';
 import { SimulationToolbar } from './simulation-toolbar';
 import { SystemSimulationToolbar } from './system-simulation-toolbar';
 import { generateId } from '@/lib/utils/id-generator';
+import { getBlockDef } from '@/lib/blocks/registry';
+import '@/lib/blocks'; // ensure built-in blocks are registered
+import type { FunctionBlockConfig } from '@/lib/types/function-block';
+import { deserializeSystemToCanvas } from '@/lib/persistence/serializer';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const nodeTypes: Record<string, any> = {
@@ -43,6 +48,7 @@ const nodeTypes: Record<string, any> = {
   chartBlock: ChartBlockNode,
   sourceBlock: SourceBlockNode,
   sinkBlock: SinkBlockNode,
+  functionBlock: FunctionBlockNode,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -279,7 +285,7 @@ export function StateCanvas() {
       if (!targetNode) return false;
       if (isSystemView) {
         // System view: target must be a block with an input handle
-        return targetNode.type === 'chartBlock' || targetNode.type === 'sinkBlock';
+        return targetNode.type === 'chartBlock' || targetNode.type === 'sinkBlock' || targetNode.type === 'functionBlock';
       }
       if (targetNode.type !== 'stateNode') return false;
       return true;
@@ -386,6 +392,36 @@ export function StateCanvas() {
           allEdges.map((e) => e.id)
         );
       }
+
+      // Ctrl+C = copy
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        e.preventDefault();
+        useCanvasStore.getState().copySelectedNodes(selectedNodeIds);
+      }
+
+      // Ctrl+V = paste
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault();
+        const center = screenToFlowPosition({
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2,
+        });
+        const newIds = useCanvasStore.getState().pasteNodes(center);
+        if (newIds.length > 0) {
+          setSelection(newIds, []);
+          useProjectStore.getState().markDirty();
+        }
+      }
+
+      // Ctrl+D = duplicate
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        e.preventDefault();
+        const newIds = useCanvasStore.getState().duplicateNodes(selectedNodeIds);
+        if (newIds.length > 0) {
+          setSelection(newIds, []);
+          useProjectStore.getState().markDirty();
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -400,6 +436,7 @@ export function StateCanvas() {
     isSystemView,
     nodes,
     edges,
+    screenToFlowPosition,
   ]);
 
   // Wire zoom buttons
@@ -426,6 +463,70 @@ export function StateCanvas() {
   const isSelectMode = interactionMode === 'select';
   const cursorClass =
     interactionMode === 'addState' ? 'cursor-crosshair' : '';
+
+  // Drag-and-drop from library panel
+  const handleDragOver = useCallback(
+    (event: React.DragEvent) => {
+      if (!isSystemView) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+    },
+    [isSystemView]
+  );
+
+  const handleDrop = useCallback(
+    (event: React.DragEvent) => {
+      if (!isSystemView) return;
+      event.preventDefault();
+      const defType = event.dataTransfer.getData('application/function-block');
+      if (!defType) return;
+      const def = getBlockDef(defType);
+      if (!def) return;
+
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      const snapped = snapEnabled
+        ? snapToGrid(position, gridSize)
+        : position;
+
+      const params: Record<string, number | string | boolean> = {};
+      for (const p of def.params) {
+        params[p.id] = p.defaultValue;
+      }
+      const config: FunctionBlockConfig = { defType, params };
+
+      const blockId = generateId();
+      const project = useProjectStore.getState().currentProject;
+      if (!project) return;
+
+      useProjectStore.getState().addSystemBlock(
+        'functionBlock',
+        def.name,
+        snapped
+      );
+
+      // Update the config to use the correct defType and params
+      const blocks = useProjectStore.getState().currentProject?.systemBlocks ?? [];
+      const lastBlock = blocks[blocks.length - 1];
+      if (lastBlock) {
+        useProjectStore.getState().updateSystemBlock(lastBlock.id, {
+          config: config as unknown as Record<string, unknown>,
+          size: { ...def.defaultSize },
+        });
+      }
+
+      // Reload canvas to show the new block
+      const updatedProject = useProjectStore.getState().currentProject;
+      if (updatedProject) {
+        const { nodes: newNodes, edges: newEdges } = deserializeSystemToCanvas(updatedProject);
+        useCanvasStore.getState().setNodes(newNodes);
+        useCanvasStore.getState().setEdges(newEdges);
+      }
+    },
+    [isSystemView, screenToFlowPosition, snapEnabled, gridSize]
+  );
 
   const svgDefs = useMemo(
     () => (
@@ -487,6 +588,8 @@ export function StateCanvas() {
           panOnDrag={isSelectMode ? [1, 2] : true}
           selectionMode={SelectionMode.Partial}
           nodeDragThreshold={2}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
           deleteKeyCode={null}
           zIndexMode="auto"
           elevateNodesOnSelect={false}

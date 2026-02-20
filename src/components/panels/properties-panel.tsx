@@ -9,6 +9,7 @@ import { AnnotationProperties } from './annotation-properties';
 import { SourceBlockProperties } from './source-block-properties';
 import { SinkBlockProperties } from './sink-block-properties';
 import { ChartBlockProperties } from './chart-block-properties';
+import { FunctionBlockProperties } from './function-block-properties';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { TransitionEdgeData } from '@/lib/types/canvas';
 
@@ -64,6 +65,14 @@ export function PropertiesPanel() {
     return (
       <ScrollArea className="h-full">
         <SinkBlockProperties nodeId={selectedNode.id} data={selectedNode.data} />
+      </ScrollArea>
+    );
+  }
+
+  if (selectedNode && selectedNode.type === 'functionBlock') {
+    return (
+      <ScrollArea className="h-full">
+        <FunctionBlockProperties nodeId={selectedNode.id} data={selectedNode.data} />
       </ScrollArea>
     );
   }

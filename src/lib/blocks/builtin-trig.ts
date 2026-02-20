@@ -1,0 +1,118 @@
+import type { FunctionBlockDef } from '../types/function-block';
+
+export const TRIG_BLOCKS: FunctionBlockDef[] = [
+  {
+    type: 'trig.sin',
+    category: 'trigonometry',
+    name: 'Sin',
+    symbol: 'sin',
+    description: 'Sine function (radians)',
+    inputs: [{ id: 'in', name: 'In', dataType: 'number' }],
+    outputs: [{ id: 'out', name: 'Out', dataType: 'number' }],
+    params: [],
+    defaultSize: { width: 90, height: 60 },
+    execute: (inputs) => ({
+      outputs: { out: Math.sin(inputs.in ?? 0) },
+      state: {},
+    }),
+    codeGen: {
+      c: { expression: 'sin({in})', includes: ['<math.h>'] },
+      scl: { expression: 'SIN({in})' },
+    },
+  },
+  {
+    type: 'trig.cos',
+    category: 'trigonometry',
+    name: 'Cos',
+    symbol: 'cos',
+    description: 'Cosine function (radians)',
+    inputs: [{ id: 'in', name: 'In', dataType: 'number' }],
+    outputs: [{ id: 'out', name: 'Out', dataType: 'number' }],
+    params: [],
+    defaultSize: { width: 90, height: 60 },
+    execute: (inputs) => ({
+      outputs: { out: Math.cos(inputs.in ?? 0) },
+      state: {},
+    }),
+    codeGen: {
+      c: { expression: 'cos({in})', includes: ['<math.h>'] },
+      scl: { expression: 'COS({in})' },
+    },
+  },
+  {
+    type: 'trig.tan',
+    category: 'trigonometry',
+    name: 'Tan',
+    symbol: 'tan',
+    description: 'Tangent function (radians)',
+    inputs: [{ id: 'in', name: 'In', dataType: 'number' }],
+    outputs: [{ id: 'out', name: 'Out', dataType: 'number' }],
+    params: [],
+    defaultSize: { width: 90, height: 60 },
+    execute: (inputs) => ({
+      outputs: { out: Math.tan(inputs.in ?? 0) },
+      state: {},
+    }),
+    codeGen: {
+      c: { expression: 'tan({in})', includes: ['<math.h>'] },
+      scl: { expression: 'TAN({in})' },
+    },
+  },
+  {
+    type: 'trig.asin',
+    category: 'trigonometry',
+    name: 'Asin',
+    symbol: 'asin',
+    description: 'Arcsine function',
+    inputs: [{ id: 'in', name: 'In', dataType: 'number' }],
+    outputs: [{ id: 'out', name: 'Out', dataType: 'number' }],
+    params: [],
+    defaultSize: { width: 90, height: 60 },
+    execute: (inputs) => ({
+      outputs: { out: Math.asin(Math.max(-1, Math.min(1, inputs.in ?? 0))) },
+      state: {},
+    }),
+    codeGen: {
+      c: { expression: 'asin({in})', includes: ['<math.h>'] },
+      scl: { expression: 'ASIN({in})' },
+    },
+  },
+  {
+    type: 'trig.acos',
+    category: 'trigonometry',
+    name: 'Acos',
+    symbol: 'acos',
+    description: 'Arccosine function',
+    inputs: [{ id: 'in', name: 'In', dataType: 'number' }],
+    outputs: [{ id: 'out', name: 'Out', dataType: 'number' }],
+    params: [],
+    defaultSize: { width: 90, height: 60 },
+    execute: (inputs) => ({
+      outputs: { out: Math.acos(Math.max(-1, Math.min(1, inputs.in ?? 0))) },
+      state: {},
+    }),
+    codeGen: {
+      c: { expression: 'acos({in})', includes: ['<math.h>'] },
+      scl: { expression: 'ACOS({in})' },
+    },
+  },
+  {
+    type: 'trig.atan',
+    category: 'trigonometry',
+    name: 'Atan',
+    symbol: 'atan',
+    description: 'Arctangent function',
+    inputs: [{ id: 'in', name: 'In', dataType: 'number' }],
+    outputs: [{ id: 'out', name: 'Out', dataType: 'number' }],
+    params: [],
+    defaultSize: { width: 90, height: 60 },
+    execute: (inputs) => ({
+      outputs: { out: Math.atan(inputs.in ?? 0) },
+      state: {},
+    }),
+    codeGen: {
+      c: { expression: 'atan({in})', includes: ['<math.h>'] },
+      scl: { expression: 'ATAN({in})' },
+    },
+  },
+];

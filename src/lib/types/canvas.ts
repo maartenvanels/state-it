@@ -55,6 +55,13 @@ export interface SinkBlockNodeData {
   [key: string]: unknown;
 }
 
+export interface FunctionBlockNodeData {
+  defType: string;
+  name: string;
+  params: Record<string, number | string | boolean>;
+  [key: string]: unknown;
+}
+
 export interface SystemWireEdgeData {
   wireId: string;
   [key: string]: unknown;
@@ -66,10 +73,11 @@ export type AnnotationNode = Node<AnnotationNodeData, 'annotationNode'>;
 export type ChartBlockNode = Node<ChartBlockNodeData, 'chartBlock'>;
 export type SourceBlockNode = Node<SourceBlockNodeData, 'sourceBlock'>;
 export type SinkBlockNode = Node<SinkBlockNodeData, 'sinkBlock'>;
+export type FunctionBlockNode = Node<FunctionBlockNodeData, 'functionBlock'>;
 export type TransitionEdge = Edge<TransitionEdgeData>;
 export type SystemWireEdge = Edge<SystemWireEdgeData>;
 
-export type CanvasNode = StateNode | DefaultTransitionNode | AnnotationNode | ChartBlockNode | SourceBlockNode | SinkBlockNode;
+export type CanvasNode = StateNode | DefaultTransitionNode | AnnotationNode | ChartBlockNode | SourceBlockNode | SinkBlockNode | FunctionBlockNode;
 
 export const NODE_TYPES = {
   stateNode: 'stateNode',
@@ -78,6 +86,7 @@ export const NODE_TYPES = {
   chartBlock: 'chartBlock',
   sourceBlock: 'sourceBlock',
   sinkBlock: 'sinkBlock',
+  functionBlock: 'functionBlock',
 } as const;
 
 export const EDGE_TYPES = {

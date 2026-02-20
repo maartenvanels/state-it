@@ -9,6 +9,8 @@ import { DEFAULT_BLOCK_CONFIGS, DEFAULT_BLOCK_SIZES } from '../types/system';
 import type { Variable } from '../types/variable';
 import type { CanvasNode, TransitionEdge } from '../types/canvas';
 import { generateId } from '../utils/id-generator';
+import { getBlockDef } from '../blocks/registry';
+import '../blocks'; // ensure built-in blocks are registered
 import { serializeCanvasToChart, serializeSystemCanvas } from '../persistence/serializer';
 
 interface ProjectState {
@@ -40,6 +42,7 @@ interface ProjectActions {
 
   // System block management
   addSystemBlock: (type: SystemBlockType, name: string, position: { x: number; y: number }) => string;
+  addFunctionBlock: (defType: string, name: string, position: { x: number; y: number }) => string;
   removeSystemBlock: (blockId: string) => void;
   updateSystemBlock: (blockId: string, updates: Partial<SystemBlock>) => void;
 
@@ -452,6 +455,34 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
         position,
         size: { ...DEFAULT_BLOCK_SIZES[type] },
         config: { ...DEFAULT_BLOCK_CONFIGS[type] },
+      };
+      set({
+        currentProject: {
+          ...current,
+          systemBlocks: [...current.systemBlocks, block],
+          updatedAt: new Date().toISOString(),
+        },
+        isDirty: true,
+      });
+      return id;
+    },
+
+    addFunctionBlock: (defType, name, position) => {
+      const current = get().currentProject;
+      if (!current) return '';
+      const id = generateId();
+      const def = getBlockDef(defType);
+      const params: Record<string, number | string | boolean> = {};
+      for (const p of def?.params ?? []) params[p.id] = p.defaultValue;
+      const size = def?.defaultSize ?? { width: 120, height: 80 };
+      const block: SystemBlock = {
+        id,
+        type: 'functionBlock',
+        name,
+        chartId: null,
+        position,
+        size: { ...size },
+        config: { defType, params } as unknown as Record<string, unknown>,
       };
       set({
         currentProject: {

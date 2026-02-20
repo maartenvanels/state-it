@@ -9,6 +9,7 @@ import { useProjectStore } from '@/lib/store/project-store';
 import { useNavigationStore } from '@/lib/store/navigation-store';
 import { Code2, Copy, Download, AlertTriangle } from 'lucide-react';
 import { generateProject } from '@/lib/codegen/project-generator';
+import { generateFunctionBlockFiles } from '@/lib/codegen/function-block-generator';
 import { downloadFile } from '@/lib/persistence/exporter';
 import type { GeneratedFile } from '@/lib/types/codegen';
 
@@ -33,9 +34,29 @@ export function CodePreviewPanel() {
     return chart?.name ?? 'StateMachine';
   });
 
+  const activeView = useNavigationStore((s) => s.activeView);
+  const isSystemView = activeView.type === 'system';
+  const selectedNodeIds = useUIStore((s) => s.selectedNodeIds);
+
   const stateCount = nodes.filter((n) => n.type === 'stateNode').length;
 
+  // Check if a function block is selected in system view
+  const selectedFunctionBlock = useMemo(() => {
+    if (!isSystemView || selectedNodeIds.length !== 1 || !project) return null;
+    const block = project.systemBlocks.find(
+      (b) => b.id === selectedNodeIds[0] && b.type === 'functionBlock'
+    );
+    return block ?? null;
+  }, [isSystemView, selectedNodeIds, project]);
+
   const generated = useMemo(() => {
+    // Function block code generation
+    if (selectedFunctionBlock) {
+      const files = generateFunctionBlockFiles(selectedFunctionBlock);
+      return { files, messages: [] };
+    }
+
+    // Chart code generation
     if (stateCount === 0) {
       return { files: [] as GeneratedFile[], messages: [] };
     }
@@ -47,7 +68,7 @@ export function CodePreviewPanel() {
       projectName: chartName,
       target: 'both',
     });
-  }, [nodes, edges, variables, chartName, stateCount]);
+  }, [nodes, edges, variables, chartName, stateCount, selectedFunctionBlock]);
 
   const warnings = generated.messages.filter((m) => m.level === 'warning');
   const errors = generated.messages.filter((m) => m.level === 'error');
@@ -109,7 +130,7 @@ export function CodePreviewPanel() {
           )}
         </span>
         <div className="flex items-center gap-1">
-          {stateCount > 0 && (
+          {generated.files.length > 0 && (
             <>
               <Button
                 variant="ghost"
@@ -165,7 +186,9 @@ export function CodePreviewPanel() {
               )
             ) : (
               <span className="text-muted-foreground">
-                {'/* Add states to see generated code */'}
+                {isSystemView
+                  ? '/* Select a function block to see generated code */'
+                  : '/* Add states to see generated code */'}
               </span>
             )}
           </pre>

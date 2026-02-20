@@ -14,6 +14,8 @@ import {
   Plus,
   StickyNote,
   Clipboard,
+  Copy,
+  CopyPlus,
   Maximize2,
   BoxSelect,
   Trash2,
@@ -31,6 +33,10 @@ import {
   Group,
   AlignLeft,
   GalleryVerticalEnd,
+  FlipHorizontal,
+  FlipVertical,
+  RotateCw,
+  RotateCcw,
   LayoutGrid,
   Hash,
   Activity,
@@ -44,9 +50,13 @@ import { useNavigationStore } from '@/lib/store/navigation-store';
 import { useReactFlow } from '@xyflow/react';
 import { snapToGrid } from '@/lib/utils/geometry';
 import { useCallback, useRef } from 'react';
-import type { AlignDirection, DistributeAxis, MatchDimension } from '@/lib/utils/geometry';
+import type { AlignDirection, DistributeAxis, MatchDimension, FlipAxis, RotateDirection } from '@/lib/utils/geometry';
+import { hasClipboard } from '@/lib/utils/clipboard';
 import { deserializeSystemToCanvas } from '@/lib/persistence/serializer';
 import type { SystemBlockType } from '@/lib/types/system';
+import { getAllCategories, getBlocksByCategory } from '@/lib/blocks/registry';
+import { CATEGORY_LABELS } from '@/lib/types/function-block';
+import '@/lib/blocks';
 
 export function CanvasContextMenu({
   children,
@@ -62,6 +72,11 @@ export function CanvasContextMenu({
   const distributeNodes = useCanvasStore((s) => s.distributeNodes);
   const matchNodeSizes = useCanvasStore((s) => s.matchNodeSizes);
   const groupNodesIntoState = useCanvasStore((s) => s.groupNodesIntoState);
+  const flipNodes = useCanvasStore((s) => s.flipNodes);
+  const rotateNodes = useCanvasStore((s) => s.rotateNodes);
+  const copySelectedNodes = useCanvasStore((s) => s.copySelectedNodes);
+  const pasteNodes = useCanvasStore((s) => s.pasteNodes);
+  const duplicateNodes = useCanvasStore((s) => s.duplicateNodes);
   const nodes = useCanvasStore((s) => s.nodes);
 
   const selectedNodeIds = useUIStore((s) => s.selectedNodeIds);
@@ -125,6 +140,19 @@ export function CanvasContextMenu({
       ).length ?? 0;
       const position = screenToFlowPosition(contextPosition.current);
       store.addSystemBlock(type, `${baseName}_${blockCount + 1}`, position);
+      reloadSystemCanvas();
+    },
+    [screenToFlowPosition, reloadSystemCanvas]
+  );
+
+  const handleAddFunctionBlock = useCallback(
+    (defType: string, name: string) => {
+      const store = useProjectStore.getState();
+      const blockCount = store.currentProject?.systemBlocks.filter(
+        (b) => b.type === 'functionBlock'
+      ).length ?? 0;
+      const position = screenToFlowPosition(contextPosition.current);
+      store.addFunctionBlock(defType, `${name}_${blockCount + 1}`, position);
       reloadSystemCanvas();
     },
     [screenToFlowPosition, reloadSystemCanvas]
@@ -205,6 +233,41 @@ export function CanvasContextMenu({
     }
   }, [selectedNodeIds, groupNodesIntoState, setSelection]);
 
+  const handleFlip = useCallback(
+    (axis: FlipAxis) => {
+      flipNodes(selectedNodeIds, axis);
+    },
+    [selectedNodeIds, flipNodes]
+  );
+
+  const handleRotate = useCallback(
+    (direction: RotateDirection) => {
+      rotateNodes(selectedNodeIds, direction);
+    },
+    [selectedNodeIds, rotateNodes]
+  );
+
+  const handleCopy = useCallback(() => {
+    copySelectedNodes(selectedNodeIds);
+  }, [selectedNodeIds, copySelectedNodes]);
+
+  const handlePaste = useCallback(() => {
+    const position = screenToFlowPosition(contextPosition.current);
+    const newIds = pasteNodes(position);
+    if (newIds.length > 0) {
+      setSelection(newIds, []);
+      useProjectStore.getState().markDirty();
+    }
+  }, [screenToFlowPosition, pasteNodes, setSelection]);
+
+  const handleDuplicate = useCallback(() => {
+    const newIds = duplicateNodes(selectedNodeIds);
+    if (newIds.length > 0) {
+      setSelection(newIds, []);
+      useProjectStore.getState().markDirty();
+    }
+  }, [selectedNodeIds, duplicateNodes, setSelection]);
+
   return (
     <ContextMenu>
       <ContextMenuTrigger onContextMenu={handleContextMenu} asChild>
@@ -236,6 +299,25 @@ export function CanvasContextMenu({
               <Monitor className="mr-2 h-4 w-4" />
               Add Display
             </ContextMenuItem>
+            <ContextMenuSeparator />
+            {getAllCategories().map((cat) => (
+              <ContextMenuSub key={cat}>
+                <ContextMenuSubTrigger>
+                  {CATEGORY_LABELS[cat]}
+                </ContextMenuSubTrigger>
+                <ContextMenuSubContent className="w-48">
+                  {getBlocksByCategory(cat).map((block) => (
+                    <ContextMenuItem
+                      key={block.type}
+                      onClick={() => handleAddFunctionBlock(block.type, block.name)}
+                    >
+                      <span className="mr-2 w-5 text-center font-bold text-xs">{block.symbol}</span>
+                      {block.name}
+                    </ContextMenuItem>
+                  ))}
+                </ContextMenuSubContent>
+              </ContextMenuSub>
+            ))}
           </>
         ) : (
           <>
@@ -264,9 +346,24 @@ export function CanvasContextMenu({
 
         <ContextMenuSeparator />
 
-        <ContextMenuItem disabled>
+        {hasSelection && (
+          <>
+            <ContextMenuItem onClick={handleCopy}>
+              <Copy className="mr-2 h-4 w-4" />
+              Copy
+              <span className="ml-auto text-xs text-muted-foreground">Ctrl+C</span>
+            </ContextMenuItem>
+            <ContextMenuItem onClick={handleDuplicate}>
+              <CopyPlus className="mr-2 h-4 w-4" />
+              Duplicate
+              <span className="ml-auto text-xs text-muted-foreground">Ctrl+D</span>
+            </ContextMenuItem>
+          </>
+        )}
+        <ContextMenuItem disabled={!hasClipboard()} onClick={handlePaste}>
           <Clipboard className="mr-2 h-4 w-4" />
           Paste
+          <span className="ml-auto text-xs text-muted-foreground">Ctrl+V</span>
         </ContextMenuItem>
 
         {/* -- Multi-selection actions (chart view only, ≥2 nodes) -- */}
@@ -348,6 +445,40 @@ export function CanvasContextMenu({
                 <ContextMenuItem onClick={() => handleMatchSize('both')}>
                   <Maximize className="mr-2 h-4 w-4" />
                   Both
+                </ContextMenuItem>
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>
+                <FlipHorizontal className="mr-2 h-4 w-4" />
+                Flip
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="w-48">
+                <ContextMenuItem onClick={() => handleFlip('horizontal')}>
+                  <FlipHorizontal className="mr-2 h-4 w-4" />
+                  Horizontal
+                </ContextMenuItem>
+                <ContextMenuItem onClick={() => handleFlip('vertical')}>
+                  <FlipVertical className="mr-2 h-4 w-4" />
+                  Vertical
+                </ContextMenuItem>
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>
+                <RotateCw className="mr-2 h-4 w-4" />
+                Rotate
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="w-48">
+                <ContextMenuItem onClick={() => handleRotate('cw')}>
+                  <RotateCw className="mr-2 h-4 w-4" />
+                  90° Clockwise
+                </ContextMenuItem>
+                <ContextMenuItem onClick={() => handleRotate('ccw')}>
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  90° Counter-clockwise
                 </ContextMenuItem>
               </ContextMenuSubContent>
             </ContextMenuSub>

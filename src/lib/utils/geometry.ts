@@ -96,7 +96,7 @@ interface NodeRect {
   parentId?: string;
 }
 
-function getNodeRects(nodeIds: string[], allNodes: CanvasNode[]): NodeRect[] {
+export function getNodeRects(nodeIds: string[], allNodes: CanvasNode[]): NodeRect[] {
   return nodeIds
     .map((id) => allNodes.find((n) => n.id === id))
     .filter((n): n is CanvasNode => !!n)
@@ -114,7 +114,7 @@ function getNodeRects(nodeIds: string[], allNodes: CanvasNode[]): NodeRect[] {
     });
 }
 
-function absoluteToRelative(
+export function absoluteToRelative(
   absPos: { x: number; y: number },
   parentId: string | undefined,
   allNodes: CanvasNode[]
@@ -255,4 +255,91 @@ export function calcMatchedSize(
     case 'both':
       return { width: maxWidth, height: maxHeight };
   }
+}
+
+// --- Flip & Rotate utilities ---
+
+export type FlipAxis = 'horizontal' | 'vertical';
+export type RotateDirection = 'cw' | 'ccw';
+
+/**
+ * Calculate new positions for nodes after flipping their arrangement.
+ * Mirrors positions around the bounding box center.
+ */
+export function calcFlippedPositions(
+  nodeIds: string[],
+  allNodes: CanvasNode[],
+  axis: FlipAxis
+): Map<string, { x: number; y: number }> {
+  const rects = getNodeRects(nodeIds, allNodes);
+  if (rects.length < 2) return new Map();
+
+  const result = new Map<string, { x: number; y: number }>();
+
+  if (axis === 'horizontal') {
+    const minX = Math.min(...rects.map((r) => r.absX));
+    const maxX = Math.max(...rects.map((r) => r.absX + r.width));
+    const centerX = (minX + maxX) / 2;
+
+    for (const r of rects) {
+      const mirroredAbsX = 2 * centerX - r.absX - r.width;
+      result.set(r.id, absoluteToRelative({ x: mirroredAbsX, y: r.absY }, r.parentId, allNodes));
+    }
+  } else {
+    const minY = Math.min(...rects.map((r) => r.absY));
+    const maxY = Math.max(...rects.map((r) => r.absY + r.height));
+    const centerY = (minY + maxY) / 2;
+
+    for (const r of rects) {
+      const mirroredAbsY = 2 * centerY - r.absY - r.height;
+      result.set(r.id, absoluteToRelative({ x: r.absX, y: mirroredAbsY }, r.parentId, allNodes));
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Calculate new positions for nodes after rotating their arrangement
+ * 90 degrees clockwise or counter-clockwise around their bounding box center.
+ */
+export function calcRotatedPositions(
+  nodeIds: string[],
+  allNodes: CanvasNode[],
+  direction: RotateDirection
+): Map<string, { x: number; y: number }> {
+  const rects = getNodeRects(nodeIds, allNodes);
+  if (rects.length < 2) return new Map();
+
+  const minX = Math.min(...rects.map((r) => r.absX));
+  const maxX = Math.max(...rects.map((r) => r.absX + r.width));
+  const minY = Math.min(...rects.map((r) => r.absY));
+  const maxY = Math.max(...rects.map((r) => r.absY + r.height));
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+
+  const result = new Map<string, { x: number; y: number }>();
+
+  for (const r of rects) {
+    const nodeCenterX = r.absX + r.width / 2;
+    const nodeCenterY = r.absY + r.height / 2;
+    const dx = nodeCenterX - centerX;
+    const dy = nodeCenterY - centerY;
+
+    let newDx: number, newDy: number;
+    if (direction === 'cw') {
+      newDx = -dy;
+      newDy = dx;
+    } else {
+      newDx = dy;
+      newDy = -dx;
+    }
+
+    const newAbsX = centerX + newDx - r.width / 2;
+    const newAbsY = centerY + newDy - r.height / 2;
+
+    result.set(r.id, absoluteToRelative({ x: newAbsX, y: newAbsY }, r.parentId, allNodes));
+  }
+
+  return result;
 }

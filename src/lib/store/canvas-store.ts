@@ -27,12 +27,18 @@ import {
   calcAlignedPositions,
   calcDistributedPositions,
   calcMatchedSize,
+  calcFlippedPositions,
+  calcRotatedPositions,
   getAbsolutePosition,
   getNodeSize,
+  getNodeRects,
   type AlignDirection,
   type DistributeAxis,
   type MatchDimension,
+  type FlipAxis,
+  type RotateDirection,
 } from '../utils/geometry';
+import { getClipboard, setClipboard, type ClipboardData } from '../utils/clipboard';
 
 interface CanvasState {
   nodes: CanvasNode[];
@@ -89,10 +95,113 @@ interface CanvasActions {
   distributeNodes: (nodeIds: string[], axis: DistributeAxis) => void;
   matchNodeSizes: (nodeIds: string[], dimension: MatchDimension) => void;
   groupNodesIntoState: (nodeIds: string[]) => string | null;
+  flipNodes: (nodeIds: string[], axis: FlipAxis) => void;
+  rotateNodes: (nodeIds: string[], direction: RotateDirection) => void;
+  copySelectedNodes: (nodeIds: string[]) => void;
+  pasteNodes: (viewportCenter: { x: number; y: number }) => string[];
+  duplicateNodes: (nodeIds: string[]) => string[];
 
   setNodes: (nodes: CanvasNode[]) => void;
   setEdges: (edges: TransitionEdge[]) => void;
   reset: () => void;
+}
+
+/**
+ * Clone a set of nodes and the edges between them.
+ * Every node/edge gets a new ID. Parent-child within selection is remapped.
+ * Orphaned children (parent not in selection) get unnested.
+ */
+function cloneNodesAndEdges(
+  sourceNodes: CanvasNode[],
+  sourceEdges: TransitionEdge[],
+  _allNodes: CanvasNode[],
+  offset: { x: number; y: number }
+): { clonedNodes: CanvasNode[]; clonedEdges: TransitionEdge[] } {
+  const idMap = new Map<string, string>();
+  const sourceNodeIds = new Set(sourceNodes.map((n) => n.id));
+
+  for (const node of sourceNodes) {
+    idMap.set(node.id, generateId());
+  }
+
+  const clonedNodes: CanvasNode[] = sourceNodes.map((node) => {
+    const newId = idMap.get(node.id)!;
+    const parentInSelection = node.parentId && sourceNodeIds.has(node.parentId);
+    const newParentId = parentInSelection ? idMap.get(node.parentId!) : undefined;
+
+    // Top-level nodes (or orphaned) get offset; children within selection keep relative pos
+    const shouldOffset = !parentInSelection;
+    const newPosition = shouldOffset
+      ? { x: node.position.x + offset.x, y: node.position.y + offset.y }
+      : { ...node.position };
+
+    if (node.type === 'stateNode') {
+      return {
+        ...node,
+        id: newId,
+        position: newPosition,
+        parentId: newParentId,
+        extent: newParentId ? ('parent' as const) : undefined,
+        selected: false,
+        data: {
+          ...node.data,
+          stateBlock: {
+            ...node.data.stateBlock,
+            id: newId,
+            name: `${node.data.stateBlock.name}_copy`,
+            parentId: newParentId ?? null,
+            position: newPosition,
+          },
+          isHighlighted: false,
+          isDropTarget: false,
+        },
+      } as StateNode;
+    }
+
+    if (node.type === 'defaultTransition') {
+      return {
+        ...node,
+        id: newId,
+        position: newPosition,
+        parentId: newParentId,
+        extent: newParentId ? ('parent' as const) : undefined,
+        selected: false,
+        data: {
+          ...node.data,
+          targetStateId: idMap.get(node.data.targetStateId) ?? node.data.targetStateId,
+        },
+      } as CanvasNode;
+    }
+
+    // annotationNode and any other type
+    return {
+      ...node,
+      id: newId,
+      position: newPosition,
+      parentId: newParentId,
+      extent: newParentId ? ('parent' as const) : undefined,
+      selected: false,
+    } as CanvasNode;
+  });
+
+  // Clone edges where both source and target are in the selection
+  const clonedEdges: TransitionEdge[] = sourceEdges
+    .filter((e) => sourceNodeIds.has(e.source) && sourceNodeIds.has(e.target))
+    .map((edge) => {
+      const newEdgeId = generateId();
+      return {
+        ...edge,
+        id: newEdgeId,
+        source: idMap.get(edge.source) ?? edge.source,
+        target: idMap.get(edge.target) ?? edge.target,
+        selected: false,
+        data: edge.data
+          ? { ...edge.data, transitionId: newEdgeId }
+          : edge.data,
+      } as TransitionEdge;
+    });
+
+  return { clonedNodes, clonedEdges };
 }
 
 const initialState: CanvasState = {
@@ -607,6 +716,115 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
 
         set({ nodes: [groupNode, ...updatedNodes] });
         return groupId;
+      },
+
+      flipNodes: (nodeIds, axis) => {
+        const positions = calcFlippedPositions(nodeIds, get().nodes, axis);
+        if (positions.size === 0) return;
+        set({
+          nodes: get().nodes.map((node) => {
+            const newPos = positions.get(node.id);
+            if (!newPos) return node;
+            if (node.type === 'stateNode') {
+              return {
+                ...node,
+                position: newPos,
+                data: {
+                  ...node.data,
+                  stateBlock: { ...node.data.stateBlock, position: newPos },
+                },
+              } as StateNode;
+            }
+            return { ...node, position: newPos } as CanvasNode;
+          }),
+        });
+      },
+
+      rotateNodes: (nodeIds, direction) => {
+        const positions = calcRotatedPositions(nodeIds, get().nodes, direction);
+        if (positions.size === 0) return;
+        set({
+          nodes: get().nodes.map((node) => {
+            const newPos = positions.get(node.id);
+            if (!newPos) return node;
+            if (node.type === 'stateNode') {
+              return {
+                ...node,
+                position: newPos,
+                data: {
+                  ...node.data,
+                  stateBlock: { ...node.data.stateBlock, position: newPos },
+                },
+              } as StateNode;
+            }
+            return { ...node, position: newPos } as CanvasNode;
+          }),
+        });
+      },
+
+      copySelectedNodes: (nodeIds) => {
+        const { nodes, edges } = get();
+        const selectedNodes = nodes.filter((n) => nodeIds.includes(n.id));
+        if (selectedNodes.length === 0) return;
+
+        // Calculate bounding box center as anchor
+        const rects = getNodeRects(nodeIds, nodes);
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const r of rects) {
+          minX = Math.min(minX, r.absX);
+          minY = Math.min(minY, r.absY);
+          maxX = Math.max(maxX, r.absX + r.width);
+          maxY = Math.max(maxY, r.absY + r.height);
+        }
+
+        setClipboard({
+          nodes: JSON.parse(JSON.stringify(selectedNodes)),
+          edges: JSON.parse(JSON.stringify(edges)),
+          anchorPosition: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
+        });
+      },
+
+      pasteNodes: (viewportCenter) => {
+        const clipboardData = getClipboard();
+        if (!clipboardData || clipboardData.nodes.length === 0) return [];
+
+        const offset = {
+          x: viewportCenter.x - clipboardData.anchorPosition.x,
+          y: viewportCenter.y - clipboardData.anchorPosition.y,
+        };
+        // If pasting at same spot, nudge
+        if (Math.abs(offset.x) < 10 && Math.abs(offset.y) < 10) {
+          offset.x = 40;
+          offset.y = 40;
+        }
+
+        const { clonedNodes, clonedEdges } = cloneNodesAndEdges(
+          clipboardData.nodes, clipboardData.edges, get().nodes, offset
+        );
+
+        set({
+          nodes: [...get().nodes, ...clonedNodes],
+          edges: [...get().edges, ...clonedEdges],
+        });
+
+        return clonedNodes.map((n) => n.id);
+      },
+
+      duplicateNodes: (nodeIds) => {
+        const { nodes, edges } = get();
+        const selectedNodes = nodes.filter((n) => nodeIds.includes(n.id));
+        if (selectedNodes.length === 0) return [];
+
+        const { clonedNodes, clonedEdges } = cloneNodesAndEdges(
+          selectedNodes, edges, nodes, { x: 20, y: 20 }
+        );
+
+        set({
+          nodes: [...get().nodes, ...clonedNodes],
+          edges: [...get().edges, ...clonedEdges],
+        });
+
+        return clonedNodes.map((n) => n.id);
       },
 
       setViewport: (viewport) => set({ viewport }),

@@ -1,9 +1,12 @@
 import type { StateMachineModel } from '../types/codegen';
 import type { Chart } from '../types/chart';
 import type { SystemBlock, SystemWire, ConstantConfig, SignalGeneratorConfig, ScopeConfig } from '../types/system';
+import type { FunctionBlockConfig } from '../types/function-block';
 import { evaluateStep, createSimulationContext, type SimulationContext } from './simulator';
 import { buildModel } from './model-builder';
 import { deserializeChartToCanvas } from '../persistence/serializer';
+import { getBlockDef } from '../blocks/registry';
+import '../blocks'; // ensure built-in blocks are registered
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -30,13 +33,15 @@ export interface SystemSimContext {
   portValues: PortValueMap;
   scopeData: Map<string, ScopeSample[]>;
   displayValues: Map<string, number>;
+  fbStates: Map<string, Record<string, number>>;
   tickCount: number;
 }
 
 // ─── Execution Order ───────────────────────────────────────────
 
 /**
- * Build topological execution order: sources → charts (topo-sorted) → sinks.
+ * Build topological execution order:
+ *   sources → processing blocks (charts + functionBlocks, topo-sorted) → sinks
  */
 export function buildExecutionOrder(
   blocks: SystemBlock[],
@@ -45,23 +50,25 @@ export function buildExecutionOrder(
   const sources = blocks.filter(
     (b) => b.type === 'constant' || b.type === 'signalGenerator'
   );
-  const charts = blocks.filter((b) => b.type === 'chart');
+  const processing = blocks.filter(
+    (b) => b.type === 'chart' || b.type === 'functionBlock'
+  );
   const sinks = blocks.filter(
     (b) => b.type === 'scope' || b.type === 'display'
   );
 
-  // Kahn's algorithm for chart-to-chart dependencies
-  const chartIds = new Set(charts.map((c) => c.id));
+  // Kahn's algorithm for processing block dependencies
+  const procIds = new Set(processing.map((c) => c.id));
   const inDegree = new Map<string, number>();
   const adjList = new Map<string, string[]>();
 
-  for (const c of charts) {
+  for (const c of processing) {
     inDegree.set(c.id, 0);
     adjList.set(c.id, []);
   }
 
   for (const wire of wires) {
-    if (chartIds.has(wire.sourceBlockId) && chartIds.has(wire.targetBlockId)) {
+    if (procIds.has(wire.sourceBlockId) && procIds.has(wire.targetBlockId)) {
       adjList.get(wire.sourceBlockId)!.push(wire.targetBlockId);
       inDegree.set(
         wire.targetBlockId,
@@ -70,14 +77,14 @@ export function buildExecutionOrder(
     }
   }
 
-  const queue = charts
+  const queue = processing
     .filter((c) => (inDegree.get(c.id) ?? 0) === 0)
     .map((c) => c.id);
-  const sortedCharts: string[] = [];
+  const sortedProcessing: string[] = [];
 
   while (queue.length > 0) {
     const current = queue.shift()!;
-    sortedCharts.push(current);
+    sortedProcessing.push(current);
     for (const neighbor of adjList.get(current) ?? []) {
       const newDeg = (inDegree.get(neighbor) ?? 1) - 1;
       inDegree.set(neighbor, newDeg);
@@ -85,16 +92,16 @@ export function buildExecutionOrder(
     }
   }
 
-  // Append any remaining charts (cycles — best-effort for v1)
-  for (const c of charts) {
-    if (!sortedCharts.includes(c.id)) {
-      sortedCharts.push(c.id);
+  // Append any remaining (cycles — best-effort)
+  for (const c of processing) {
+    if (!sortedProcessing.includes(c.id)) {
+      sortedProcessing.push(c.id);
     }
   }
 
   return [
     ...sources.map((s) => s.id),
-    ...sortedCharts,
+    ...sortedProcessing,
     ...sinks.map((s) => s.id),
   ];
 }
@@ -113,6 +120,7 @@ export function createSystemSimContext(
   const portValues: PortValueMap = new Map();
   const scopeData = new Map<string, ScopeSample[]>();
   const displayValues = new Map<string, number>();
+  const fbStates = new Map<string, Record<string, number>>();
 
   for (const block of blocks) {
     // Initialize port value map for every block
@@ -150,10 +158,13 @@ export function createSystemSimContext(
       scopeData.set(block.id, []);
     } else if (block.type === 'display') {
       displayValues.set(block.id, 0);
+    } else if (block.type === 'functionBlock') {
+      // Initialize persistent state for timers/counters
+      fbStates.set(block.id, {});
     }
   }
 
-  return { chartStates, portValues, scopeData, displayValues, tickCount: 0 };
+  return { chartStates, portValues, scopeData, displayValues, fbStates, tickCount: 0 };
 }
 
 // ─── Tick Execution ────────────────────────────────────────────
@@ -189,6 +200,9 @@ export function executeSystemTick(
         break;
       case 'display':
         executeDisplayBlock(block, ctx);
+        break;
+      case 'functionBlock':
+        executeFunctionBlock(block, ctx);
         break;
     }
 
@@ -282,6 +296,33 @@ function executeChartBlock(
       setPortValue(ctx, block.id, handleId, Number(value) || 0);
     }
   }
+}
+
+function executeFunctionBlock(block: SystemBlock, ctx: SystemSimContext): void {
+  const config = block.config as unknown as FunctionBlockConfig;
+  const def = getBlockDef(config.defType);
+  if (!def) return;
+
+  // Gather input values
+  const inputValues: Record<string, number> = {};
+  for (const portDef of def.inputs) {
+    inputValues[portDef.id] = getPortValue(ctx, block.id, `in-${portDef.id}`);
+  }
+
+  // Get persistent state
+  const state = ctx.fbStates.get(block.id) ?? {};
+
+  // Execute the block's function
+  const result = def.execute(inputValues, config.params, state);
+
+  // Set output values
+  for (const portDef of def.outputs) {
+    const value = result.outputs[portDef.id] ?? 0;
+    setPortValue(ctx, block.id, `out-${portDef.id}`, value);
+  }
+
+  // Update persistent state
+  ctx.fbStates.set(block.id, result.state);
 }
 
 function executeScopeBlock(block: SystemBlock, ctx: SystemSimContext): void {

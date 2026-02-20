@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useUIStore } from '@/lib/store/ui-store';
-import { ExternalLink, Keyboard } from 'lucide-react';
+import { ExternalLink, Heart, Keyboard } from 'lucide-react';
 
 interface AboutDialogProps {
   open: boolean;
@@ -69,6 +69,21 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
               >
                 <ExternalLink className="mr-1.5 h-3 w-3" />
                 GitHub
+              </a>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              asChild
+            >
+              <a
+                href="https://buymeacoffee.com/mvanels"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Heart className="mr-1.5 h-3 w-3" />
+                Support
               </a>
             </Button>
           </div>

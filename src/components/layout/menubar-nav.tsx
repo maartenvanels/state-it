@@ -74,6 +74,28 @@ export function MenubarNav() {
     useUIStore.getState().setSelection([], []);
   }, []);
 
+  const handleCopy = useCallback(() => {
+    const { selectedNodeIds } = useUIStore.getState();
+    useCanvasStore.getState().copySelectedNodes(selectedNodeIds);
+  }, []);
+
+  const handlePaste = useCallback(() => {
+    const newIds = useCanvasStore.getState().pasteNodes({ x: 200, y: 200 });
+    if (newIds.length > 0) {
+      useUIStore.getState().setSelection(newIds, []);
+      useProjectStore.getState().markDirty();
+    }
+  }, []);
+
+  const handleDuplicate = useCallback(() => {
+    const { selectedNodeIds } = useUIStore.getState();
+    const newIds = useCanvasStore.getState().duplicateNodes(selectedNodeIds);
+    if (newIds.length > 0) {
+      useUIStore.getState().setSelection(newIds, []);
+      useProjectStore.getState().markDirty();
+    }
+  }, []);
+
   const handleSelectAll = useCallback(() => {
     const { nodes, edges } = useCanvasStore.getState();
     useUIStore.getState().setSelection(
@@ -154,6 +176,16 @@ export function MenubarNav() {
                 Redo <MenubarShortcut>Ctrl+Y</MenubarShortcut>
               </MenubarItem>
               <MenubarSeparator />
+              <MenubarItem onClick={handleCopy}>
+                Copy <MenubarShortcut>Ctrl+C</MenubarShortcut>
+              </MenubarItem>
+              <MenubarItem onClick={handlePaste}>
+                Paste <MenubarShortcut>Ctrl+V</MenubarShortcut>
+              </MenubarItem>
+              <MenubarItem onClick={handleDuplicate}>
+                Duplicate <MenubarShortcut>Ctrl+D</MenubarShortcut>
+              </MenubarItem>
+              <MenubarSeparator />
               <MenubarItem onClick={handleSelectAll}>
                 Select All <MenubarShortcut>Ctrl+A</MenubarShortcut>
               </MenubarItem>
@@ -191,6 +223,16 @@ export function MenubarNav() {
               <MenubarSeparator />
               <MenubarItem onClick={() => openDialog('about')}>
                 About State It
+              </MenubarItem>
+              <MenubarSeparator />
+              <MenubarItem asChild>
+                <a
+                  href="https://buymeacoffee.com/mvanels"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Support This Project
+                </a>
               </MenubarItem>
             </MenubarContent>
           </MenubarMenu>
