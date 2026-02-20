@@ -56,6 +56,8 @@ export function CanvasContextMenu({
   const addStateNode = useCanvasStore((s) => s.addStateNode);
   const addAnnotationNode = useCanvasStore((s) => s.addAnnotationNode);
   const removeNodes = useCanvasStore((s) => s.removeNodes);
+  const removeEdges = useCanvasStore((s) => s.removeEdges);
+  const edges = useCanvasStore((s) => s.edges);
   const alignNodes = useCanvasStore((s) => s.alignNodes);
   const distributeNodes = useCanvasStore((s) => s.distributeNodes);
   const matchNodeSizes = useCanvasStore((s) => s.matchNodeSizes);
@@ -143,10 +145,37 @@ export function CanvasContextMenu({
 
   const handleDelete = useCallback(() => {
     if (selectedNodeIds.length > 0) {
+      if (isSystemView) {
+        for (const nodeId of selectedNodeIds) {
+          const node = nodes.find((n) => n.id === nodeId);
+          if (node?.type === 'chartBlock') {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const chartId = (node.data as any)?.chartId;
+            if (chartId) useProjectStore.getState().removeChart(chartId);
+          } else {
+            useProjectStore.getState().removeSystemBlock(nodeId);
+          }
+        }
+      }
       removeNodes(selectedNodeIds);
     }
+    if (selectedEdgeIds.length > 0) {
+      if (isSystemView) {
+        const wireIds = selectedEdgeIds
+          .map((edgeId) => {
+            const edge = edges.find((e) => e.id === edgeId);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return (edge?.data as any)?.wireId as string | undefined;
+          })
+          .filter(Boolean) as string[];
+        if (wireIds.length > 0) {
+          useProjectStore.getState().removeSystemWires(wireIds);
+        }
+      }
+      removeEdges(selectedEdgeIds);
+    }
     setSelection([], []);
-  }, [selectedNodeIds, removeNodes, setSelection]);
+  }, [selectedNodeIds, selectedEdgeIds, removeNodes, removeEdges, edges, nodes, isSystemView, setSelection]);
 
   const handleAlign = useCallback(
     (direction: AlignDirection) => {

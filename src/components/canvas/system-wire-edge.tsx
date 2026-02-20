@@ -41,6 +41,14 @@ function SystemWireEdgeComponent({
 
   return (
     <>
+      {/* Invisible wide hit area for easier selection */}
+      <path
+        d={edgePath}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={16}
+        className="react-flow__edge-interaction"
+      />
       <path
         id={id}
         className="react-flow__edge-path"

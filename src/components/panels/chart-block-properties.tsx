@@ -13,8 +13,7 @@ import {
 } from '@/components/ui/select';
 import { useProjectStore } from '@/lib/store/project-store';
 import { useCanvasStore } from '@/lib/store/canvas-store';
-import { deserializeSystemToCanvas } from '@/lib/persistence/serializer';
-import type { ChartBlockNodeData } from '@/lib/types/canvas';
+import type { ChartBlockNodeData, CanvasNode } from '@/lib/types/canvas';
 import type { Port } from '@/lib/types/chart';
 import type { DataType } from '@/lib/types/variable';
 import { generateId } from '@/lib/utils/id-generator';
@@ -30,21 +29,25 @@ export function ChartBlockProperties({ nodeId, data }: Props) {
     s.currentProject?.charts.find((c) => c.id === data.chartId)
   );
 
-  const refreshCanvas = useCallback(() => {
-    const project = useProjectStore.getState().currentProject;
-    if (project) {
-      const { nodes, edges } = deserializeSystemToCanvas(project);
-      useCanvasStore.getState().setNodes(nodes);
-      useCanvasStore.getState().setEdges(edges);
-    }
-  }, []);
-
   const handleRename = useCallback(
     (name: string) => {
       useProjectStore.getState().renameChart(data.chartId, name);
-      refreshCanvas();
+      // Update chartName directly on existing canvas nodes to avoid
+      // rebuilding the entire canvas (which resets dragged positions).
+      const canvasStore = useCanvasStore.getState();
+      canvasStore.setNodes(
+        canvasStore.nodes.map((node) => {
+          if (node.type === 'chartBlock' && (node.data as ChartBlockNodeData).chartId === data.chartId) {
+            return {
+              ...node,
+              data: { ...node.data, chartName: name },
+            } as CanvasNode;
+          }
+          return node;
+        })
+      );
     },
-    [data.chartId, refreshCanvas]
+    [data.chartId]
   );
 
   const handleDescriptionChange = useCallback(
@@ -65,9 +68,22 @@ export function ChartBlockProperties({ nodeId, data }: Props) {
   const handleUpdatePorts = useCallback(
     (ports: Port[]) => {
       useProjectStore.getState().updateChartPorts(data.chartId, ports);
-      refreshCanvas();
+      // Update ports directly on existing canvas nodes to avoid
+      // rebuilding the entire canvas (which resets dragged positions).
+      const canvasStore = useCanvasStore.getState();
+      canvasStore.setNodes(
+        canvasStore.nodes.map((node) => {
+          if (node.type === 'chartBlock' && (node.data as ChartBlockNodeData).chartId === data.chartId) {
+            return {
+              ...node,
+              data: { ...node.data, ports },
+            } as CanvasNode;
+          }
+          return node;
+        })
+      );
     },
-    [data.chartId, refreshCanvas]
+    [data.chartId]
   );
 
   const handleAddPort = useCallback(() => {

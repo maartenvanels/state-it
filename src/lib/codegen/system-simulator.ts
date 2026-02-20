@@ -125,22 +125,21 @@ export function createSystemSimContext(
         const model = buildModel(nodes, edges, chart.variables, chart.name);
         const simCtx = createSimulationContext(model);
 
-        // Initialize port input variables from chart's port defaults
+        // Initialize port variables from chart's port defaults (both input AND output)
         for (const port of chart.ports) {
-          if (port.direction === 'input') {
-            const defaultVal = Number(port.defaultValue) || 0;
-            simCtx.eval.variables[port.name] = defaultVal;
-          }
+          const defaultVal = Number(port.defaultValue) || 0;
+          simCtx.eval.variables[port.name] = defaultVal;
         }
 
-        if (model.defaultStateId) {
-          chartStates.set(block.id, {
-            chartId: chart.id,
-            model,
-            simCtx,
-            activeStateId: model.defaultStateId,
-          });
-        }
+        // Always create ChartSimState so the block participates in simulation.
+        // Without a defaultStateId the state machine won't step, but port
+        // mapping (input → variable → output) still runs every tick.
+        chartStates.set(block.id, {
+          chartId: chart.id,
+          model,
+          simCtx,
+          activeStateId: model.defaultStateId ?? '',
+        });
       }
     } else if (block.type === 'constant') {
       const config = block.config as unknown as ConstantConfig;
@@ -259,20 +258,23 @@ function executeChartBlock(
     }
   }
 
-  // 2. Run one state machine step (no event in auto-mode)
-  const result = evaluateStep(
-    chartState.model,
-    chartState.activeStateId,
-    null,
-    ctx.tickCount,
-    chartState.simCtx
-  );
+  // 2. Run one state machine step (only if a valid active state exists)
+  if (chartState.activeStateId) {
+    const result = evaluateStep(
+      chartState.model,
+      chartState.activeStateId,
+      null,
+      ctx.tickCount,
+      chartState.simCtx
+    );
 
-  if (result && result.toStateId) {
-    chartState.activeStateId = result.toStateId;
+    if (result && result.toStateId) {
+      chartState.activeStateId = result.toStateId;
+    }
   }
 
-  // 3. Map output variables → port output values
+  // 3. Always map output variables → port output values
+  //    This ensures data flows through the chart even when no transition fires.
   for (const port of chart.ports) {
     if (port.direction === 'output') {
       const handleId = `out-${port.id}`;
