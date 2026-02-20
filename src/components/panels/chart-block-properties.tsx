@@ -91,7 +91,7 @@ export function ChartBlockProperties({ nodeId, data }: Props) {
       id: generateId(),
       name: `port_${(chart?.ports.length ?? 0) + 1}`,
       direction: 'input',
-      dataType: 'REAL' as DataType,
+      dataType: 'float',
       defaultValue: '0',
     };
     handleUpdatePorts([...(chart?.ports ?? []), newPort]);
@@ -193,9 +193,9 @@ export function ChartBlockProperties({ nodeId, data }: Props) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="BOOL">BOOL</SelectItem>
-                    <SelectItem value="INT">INT</SelectItem>
-                    <SelectItem value="REAL">REAL</SelectItem>
+                    <SelectItem value="boolean">BOOL</SelectItem>
+                    <SelectItem value="int32">INT</SelectItem>
+                    <SelectItem value="float">REAL</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button

@@ -36,6 +36,7 @@ interface ProjectActions {
   addVariable: (chartId: string, variable: Omit<Variable, 'id'>) => string;
   updateVariable: (chartId: string, varId: string, updates: Partial<Variable>) => void;
   removeVariable: (chartId: string, varId: string) => void;
+  syncPortVariables: (chartId: string) => void;
 
   // System block management
   addSystemBlock: (type: SystemBlockType, name: string, position: { x: number; y: number }) => string;
@@ -228,6 +229,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
         },
         isDirty: true,
       });
+      get().syncPortVariables(chartId);
     },
 
     getChart: (chartId) => {
@@ -292,6 +294,68 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
         },
         isDirty: true,
       });
+    },
+
+    syncPortVariables: (chartId) => {
+      const current = get().currentProject;
+      if (!current) return;
+      const chart = current.charts.find((c) => c.id === chartId);
+      if (!chart) return;
+
+      const portIds = new Set(chart.ports.map((p) => p.id));
+      let variables = [...chart.variables];
+      let changed = false;
+
+      // Update or create variables for each port
+      for (const port of chart.ports) {
+        const existing = variables.find((v) => v.portId === port.id);
+        if (existing) {
+          // Update if port properties changed
+          const scope = port.direction as 'input' | 'output';
+          if (
+            existing.name !== port.name ||
+            existing.scope !== scope ||
+            existing.dataType !== port.dataType
+          ) {
+            variables = variables.map((v) =>
+              v.portId === port.id
+                ? { ...v, name: port.name, scope, dataType: port.dataType }
+                : v
+            );
+            changed = true;
+          }
+        } else {
+          // Create new variable for this port
+          variables.push({
+            id: generateId(),
+            name: port.name,
+            scope: port.direction,
+            dataType: port.dataType,
+            initialValue: port.defaultValue || '0',
+            description: '',
+            portId: port.id,
+          });
+          changed = true;
+        }
+      }
+
+      // Remove variables whose port no longer exists
+      const before = variables.length;
+      variables = variables.filter((v) => !v.portId || portIds.has(v.portId));
+      if (variables.length !== before) changed = true;
+
+      if (changed) {
+        set({
+          currentProject: {
+            ...current,
+            charts: current.charts.map((c) =>
+              c.id === chartId ? { ...c, variables } : c
+            ),
+            updatedAt: new Date().toISOString(),
+          },
+          isDirty: true,
+        });
+      }
     },
 
     // ─── System Block Management ──────────────────────────────

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useProjectStore } from '@/lib/store/project-store';
 import { useNavigationStore } from '@/lib/store/navigation-store';
 import type { Variable, VariableScope, DataType } from '@/lib/types/variable';
-import { Plus, Trash2, ChevronRight, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, ChevronRight, ChevronDown, Plug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -245,6 +245,7 @@ function VariableRow({
   };
 
   const hasDetails = variable.description || variable.dataType === 'enum';
+  const isPortBacked = !!variable.portId;
 
   return (
     <>
@@ -254,7 +255,8 @@ function VariableRow({
           <select
             value={variable.scope}
             onChange={(e) => onUpdate({ scope: e.target.value as VariableScope })}
-            className="w-full bg-transparent border-0 outline-none text-[10px] font-mono font-medium cursor-pointer p-0 appearance-auto"
+            disabled={isPortBacked}
+            className="w-full bg-transparent border-0 outline-none text-[10px] font-mono font-medium cursor-pointer p-0 appearance-auto disabled:cursor-default disabled:opacity-70"
             style={{ color: SCOPE_COLORS[variable.scope] }}
           >
             {SCOPES.map((s) => (
@@ -279,6 +281,9 @@ function VariableRow({
                 <ChevronRight className="h-2.5 w-2.5" />
               )}
             </button>
+            {isPortBacked && (
+              <Plug className="h-2.5 w-2.5 flex-shrink-0 text-muted-foreground/50" />
+            )}
             <input
               ref={nameRef}
               type="text"
@@ -289,9 +294,12 @@ function VariableRow({
               }}
               onBlur={commitName}
               onKeyDown={(e) => handleKeyDown(e, commitName)}
+              readOnly={isPortBacked}
               className={`w-full bg-transparent outline-none text-[10px] font-mono font-medium px-0.5 rounded ${nameError
                 ? 'ring-1 ring-destructive text-destructive'
-                : 'focus:ring-1 focus:ring-ring'
+                : isPortBacked
+                  ? 'cursor-default opacity-70'
+                  : 'focus:ring-1 focus:ring-ring'
                 }`}
               spellCheck={false}
             />
@@ -310,7 +318,8 @@ function VariableRow({
                 onToggleExpand();
               }
             }}
-            className="w-full bg-transparent border-0 outline-none text-[10px] font-mono cursor-pointer p-0 text-muted-foreground appearance-auto"
+            disabled={isPortBacked}
+            className="w-full bg-transparent border-0 outline-none text-[10px] font-mono cursor-pointer p-0 text-muted-foreground appearance-auto disabled:cursor-default disabled:opacity-70"
           >
             {DATA_TYPES.map((dt) => (
               <option key={dt.value} value={dt.value}>
@@ -336,12 +345,18 @@ function VariableRow({
 
         {/* Delete */}
         <td className="py-0.5 px-0.5">
-          <button
-            onClick={onDelete}
-            className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10"
-          >
-            <Trash2 className="h-2.5 w-2.5 text-muted-foreground hover:text-destructive" />
-          </button>
+          {isPortBacked ? (
+            <span className="p-0.5 text-[8px] text-muted-foreground/40 select-none" title="Managed by port">
+              PORT
+            </span>
+          ) : (
+            <button
+              onClick={onDelete}
+              className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10"
+            >
+              <Trash2 className="h-2.5 w-2.5 text-muted-foreground hover:text-destructive" />
+            </button>
+          )}
         </td>
       </tr>
 

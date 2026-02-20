@@ -22,6 +22,8 @@ export interface Variable {
   description: string;
   enumValues?: string[];
   arraySize?: number;
+  /** When set, this variable is auto-synced from a chart port and cannot be renamed/retyped. */
+  portId?: string;
 }
 
 export const DATA_TYPE_TO_C: Record<DataType, string> = {

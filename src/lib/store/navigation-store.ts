@@ -82,6 +82,9 @@ export const useNavigationStore = create<NavigationState & NavigationActions>()(
         );
       }
 
+      // Sync port-backed variables before loading
+      useProjectStore.getState().syncPortVariables(chartId);
+
       // Load chart canvas
       // Re-read project after flush
       const updatedProject = useProjectStore.getState().currentProject;
