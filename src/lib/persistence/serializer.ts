@@ -151,7 +151,7 @@ export function deserializeChartToCanvas(chart: Chart): {
       type: 'transition',
       data: {
         transitionId: transition.id,
-        label: transition.label,
+        label: transition.label ?? { ...EMPTY_TRANSITION_LABEL },
         priority: transition.priority,
         isDefault: transition.isDefault,
         labelOffsetX: 0,

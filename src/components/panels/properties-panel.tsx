@@ -10,6 +10,7 @@ import { SourceBlockProperties } from './source-block-properties';
 import { SinkBlockProperties } from './sink-block-properties';
 import { ChartBlockProperties } from './chart-block-properties';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import type { TransitionEdgeData } from '@/lib/types/canvas';
 
 export function PropertiesPanel() {
   const selectedNodeIds = useUIStore((s) => s.selectedNodeIds);
@@ -67,15 +68,18 @@ export function PropertiesPanel() {
     );
   }
 
-  if (selectedEdge && selectedEdge.data) {
-    return (
-      <ScrollArea className="h-full">
-        <TransitionProperties
-          edgeId={selectedEdge.id}
-          data={selectedEdge.data}
-        />
-      </ScrollArea>
-    );
+  if (selectedEdge && selectedEdge.type === 'transition' && selectedEdge.data) {
+    const transitionData = selectedEdge.data as TransitionEdgeData;
+    if (transitionData.label) {
+      return (
+        <ScrollArea className="h-full">
+          <TransitionProperties
+            edgeId={selectedEdge.id}
+            data={transitionData}
+          />
+        </ScrollArea>
+      );
+    }
   }
 
   if (selectedNodeIds.length > 1 || selectedEdgeIds.length > 1) {

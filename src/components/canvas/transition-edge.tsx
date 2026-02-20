@@ -93,7 +93,7 @@ function TransitionEdgeComponent({
     [id, storedOffsetX, storedOffsetY, updateTransitionEdge]
   );
 
-  const labelText = data ? formatTransitionLabel(data.label) : '';
+  const labelText = data?.label ? formatTransitionLabel(data.label) : '';
   const hasPriority = data && data.priority > 0;
 
   // Priority badge: offset perpendicular to edge direction at source

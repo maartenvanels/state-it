@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { useCanvasStore } from '@/lib/store/canvas-store';
-import type { TransitionEdgeData, StateNodeData } from '@/lib/types/canvas';
+import type { TransitionEdgeData } from '@/lib/types/canvas';
 import { formatTransitionLabel } from '@/lib/types/transition';
 
 interface TransitionPropertiesProps {
@@ -21,23 +21,22 @@ export function TransitionProperties({
 }: TransitionPropertiesProps) {
   const updateTransitionEdge = useCanvasStore((s) => s.updateTransitionEdge);
   const edges = useCanvasStore((s) => s.edges);
-  const nodes = useCanvasStore((s) => s.nodes);
 
-  const [event, setEvent] = useState(data.label.event ?? '');
-  const [condition, setCondition] = useState(data.label.condition ?? '');
+  const [event, setEvent] = useState(data.label?.event ?? '');
+  const [condition, setCondition] = useState(data.label?.condition ?? '');
   const [conditionAction, setConditionAction] = useState(
-    data.label.conditionAction ?? ''
+    data.label?.conditionAction ?? ''
   );
   const [transitionAction, setTransitionAction] = useState(
-    data.label.transitionAction ?? ''
+    data.label?.transitionAction ?? ''
   );
 
   // Sync state when selection changes
   useEffect(() => {
-    setEvent(data.label.event ?? '');
-    setCondition(data.label.condition ?? '');
-    setConditionAction(data.label.conditionAction ?? '');
-    setTransitionAction(data.label.transitionAction ?? '');
+    setEvent(data.label?.event ?? '');
+    setCondition(data.label?.condition ?? '');
+    setConditionAction(data.label?.conditionAction ?? '');
+    setTransitionAction(data.label?.transitionAction ?? '');
   }, [edgeId, data.label]);
 
   const commitChanges = useCallback(() => {
@@ -68,13 +67,6 @@ export function TransitionProperties({
   );
 
   const currentEdge = edges.find((e) => e.id === edgeId);
-  const sourceNode = currentEdge
-    ? nodes.find((n) => n.id === currentEdge.source)
-    : undefined;
-  const sourceStateName =
-    sourceNode?.type === 'stateNode' && sourceNode.data
-      ? (sourceNode.data as StateNodeData).stateBlock.name
-      : undefined;
   const siblingCount = currentEdge
     ? edges.filter(
       (e) => e.source === currentEdge.source && e.data && !e.data.isDefault
@@ -94,28 +86,28 @@ export function TransitionProperties({
 
       {/* Preview */}
       <div className="rounded border bg-muted/50 p-2 text-xs font-mono">
-        {data.label.event && (
+        {data.label?.event && (
           <span className="font-semibold">{data.label.event}</span>
         )}
-        {data.label.condition && (
+        {data.label?.condition && (
           <span className="text-blue-500">[{data.label.condition}]</span>
         )}
-        {data.label.conditionAction && (
+        {data.label?.conditionAction && (
           <span className="text-green-500">
             {'{'}
             {data.label.conditionAction}
             {'}'}
           </span>
         )}
-        {data.label.transitionAction && (
+        {data.label?.transitionAction && (
           <span className="text-orange-500">
             /{data.label.transitionAction}
           </span>
         )}
-        {!data.label.event &&
-          !data.label.condition &&
-          !data.label.conditionAction &&
-          !data.label.transitionAction && (
+        {!data.label?.event &&
+          !data.label?.condition &&
+          !data.label?.conditionAction &&
+          !data.label?.transitionAction && (
             <span className="text-muted-foreground italic">
               (unconditional)
             </span>
