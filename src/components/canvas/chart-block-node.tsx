@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useRef, useCallback, useState, useEffect } from 'react';
 import { Handle, Position, NodeResizer } from '@xyflow/react';
 import type { NodeProps, Node } from '@xyflow/react';
 import type { ChartBlockNodeData } from '@/lib/types/canvas';
@@ -33,6 +33,37 @@ function ChartBlockNodeComponent({
 
   const inputPorts = data.ports.filter((p) => p.direction === 'input');
   const outputPorts = data.ports.filter((p) => p.direction === 'output');
+  const hasPorts = inputPorts.length > 0 || outputPorts.length > 0;
+
+  // Measure the port area to position handles precisely at port label centers
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [portOffsets, setPortOffsets] = useState<Record<string, number>>({});
+
+  const measurePorts = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const nodeEl = container.closest('.react-flow__node') as HTMLElement | null;
+    if (!nodeEl) return;
+    const nodeRect = nodeEl.getBoundingClientRect();
+    const offsets: Record<string, number> = {};
+    container.querySelectorAll<HTMLElement>('[data-port-id]').forEach((el) => {
+      const r = el.getBoundingClientRect();
+      const centerY = r.top + r.height / 2 - nodeRect.top;
+      offsets[el.dataset.portId!] = (centerY / nodeRect.height) * 100;
+    });
+    setPortOffsets(offsets);
+  }, []);
+
+  // Re-measure when ports change or node is resized
+  useEffect(() => {
+    measurePorts();
+    const container = containerRef.current;
+    const nodeEl = container?.closest('.react-flow__node') as HTMLElement | null;
+    if (!nodeEl) return;
+    const ro = new ResizeObserver(measurePorts);
+    ro.observe(nodeEl);
+    return () => ro.disconnect();
+  }, [measurePorts, inputPorts.length, outputPorts.length, isSimActive, activeStateName]);
 
   return (
     <>
@@ -42,9 +73,11 @@ function ChartBlockNodeComponent({
         minHeight={80}
         lineClassName="!border-primary/50"
         handleClassName="!w-2 !h-2 !bg-primary !border-primary"
+        onResize={measurePorts}
       />
 
       <div
+        ref={containerRef}
         className={cn(
           'flex flex-col h-full border-2 rounded-lg bg-background shadow-sm overflow-hidden',
           isSimActive
@@ -62,37 +95,47 @@ function ChartBlockNodeComponent({
         </div>
 
         {/* Ports area */}
-        <div className="flex-1 flex justify-between px-2 py-1 min-h-[32px]">
-          {/* Input ports (left) */}
-          <div className="flex flex-col gap-1 justify-center">
-            {inputPorts.map((port) => (
-              <div key={port.id} className="flex items-center gap-1">
-                <span className="text-[9px] text-muted-foreground font-mono">
-                  {port.name}
-                </span>
-              </div>
-            ))}
-          </div>
+        {hasPorts ? (
+          <div className="flex-1 flex justify-between min-h-[32px]">
+            {/* Input ports (left) */}
+            <div className="flex flex-col justify-evenly py-0.5">
+              {inputPorts.map((port) => (
+                <div
+                  key={port.id}
+                  data-port-id={port.id}
+                  className="flex items-center pl-3 pr-1"
+                >
+                  <span className="text-[9px] text-muted-foreground font-mono">
+                    {port.name}
+                  </span>
+                </div>
+              ))}
+            </div>
 
-          {/* Output ports (right) */}
-          <div className="flex flex-col gap-1 justify-center items-end">
-            {outputPorts.map((port) => (
-              <div key={port.id} className="flex items-center gap-1">
-                <span className="text-[9px] text-muted-foreground font-mono">
-                  {port.name}
-                </span>
-              </div>
-            ))}
+            {/* Output ports (right) */}
+            <div className="flex flex-col justify-evenly py-0.5">
+              {outputPorts.map((port) => (
+                <div
+                  key={port.id}
+                  data-port-id={port.id}
+                  className="flex items-center justify-end pr-3 pl-1"
+                >
+                  <span className="text-[9px] text-muted-foreground font-mono">
+                    {port.name}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-
-        {/* Empty state hint */}
-        {inputPorts.length === 0 && outputPorts.length === 0 && !isSimActive && (
-          <div className="flex-1 flex items-center justify-center">
-            <span className="text-[10px] text-muted-foreground/50">
-              Double-click to edit
-            </span>
-          </div>
+        ) : (
+          /* Empty state hint */
+          !isSimActive && (
+            <div className="flex-1 flex items-center justify-center">
+              <span className="text-[10px] text-muted-foreground/50">
+                Double-click to edit
+              </span>
+            </div>
+          )
         )}
 
         {/* Active state during simulation */}
@@ -105,15 +148,15 @@ function ChartBlockNodeComponent({
         )}
       </div>
 
-      {/* Input port handles (left side) */}
-      {inputPorts.map((port, idx) => (
+      {/* Input port handles — positioned to align with port labels */}
+      {inputPorts.map((port) => (
         <Handle
           key={`in-${port.id}`}
           id={`in-${port.id}`}
           type="target"
           position={Position.Left}
           style={{
-            top: `${((idx + 1) / (inputPorts.length + 1)) * 100}%`,
+            top: `${portOffsets[port.id] ?? 50}%`,
             width: 8,
             height: 8,
             background: '#3b82f6',
@@ -122,15 +165,15 @@ function ChartBlockNodeComponent({
         />
       ))}
 
-      {/* Output port handles (right side) */}
-      {outputPorts.map((port, idx) => (
+      {/* Output port handles — positioned to align with port labels */}
+      {outputPorts.map((port) => (
         <Handle
           key={`out-${port.id}`}
           id={`out-${port.id}`}
           type="source"
           position={Position.Right}
           style={{
-            top: `${((idx + 1) / (outputPorts.length + 1)) * 100}%`,
+            top: `${portOffsets[port.id] ?? 50}%`,
             width: 8,
             height: 8,
             background: '#f97316',
@@ -138,36 +181,6 @@ function ChartBlockNodeComponent({
           }}
         />
       ))}
-
-      {/* Default handles for wiring when no ports defined */}
-      {inputPorts.length === 0 && (
-        <Handle
-          id="default-target"
-          type="target"
-          position={Position.Left}
-          style={{
-            top: '50%',
-            width: 8,
-            height: 8,
-            background: '#3b82f6',
-            border: '2px solid white',
-          }}
-        />
-      )}
-      {outputPorts.length === 0 && (
-        <Handle
-          id="default-source"
-          type="source"
-          position={Position.Right}
-          style={{
-            top: '50%',
-            width: 8,
-            height: 8,
-            background: '#f97316',
-            border: '2px solid white',
-          }}
-        />
-      )}
     </>
   );
 }
